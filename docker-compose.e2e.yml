@@ -1,0 +1,20 @@
+version: '3'
+
+volumes:
+  dbdata:
+    driver: local
+
+services:
+  postgres:
+    build: ./Dockerfile.dev
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      - POSTGRES_DB=etoubib_db
+      - POSTGRES_USER=default
+      - POSTGRES_PASSWORD=password
+      - TZ=UTC
+      - PGTZ=UTC
+    volumes:
+      - dbdata:/var/lib/postgresql/data

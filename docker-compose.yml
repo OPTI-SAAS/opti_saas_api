@@ -1,0 +1,47 @@
+version: '3'
+
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: db.dockerfile
+    container_name: nest_postgres
+    restart: always
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: default
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: etoubib_db
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - nest_network # Attach the app service to the custom network
+
+  app:
+    build:
+      context: .
+      dockerfile: app.dockerfile
+    container_name: nest_app
+    restart: always
+    depends_on:
+      - postgres # Ensure PostgreSQL starts before the app
+    env_file:
+      - .env.example
+    ports:
+      - '3000:3000'
+    volumes:
+      - .:/app # Mount your local code to the container
+      - /app/node_modules # Prevent conflicts with node_modules
+    networks:
+      - nest_network # Attach the app service to the custom network
+    command: ['pnpm', 'start:dev'] # Run app in dev mode
+
+volumes:
+  postgres_data:
+
+networks:
+  nest_network: # Define a custom network for communication between services
+    driver: bridge

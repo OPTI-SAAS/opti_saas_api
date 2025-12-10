@@ -1,0 +1,24 @@
+{
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch NestJS Application",
+      "program": "${workspaceFolder}/dist/main.js",
+      "preLaunchTask": "build",
+      "args": ["--inspect"],
+      "runtimeArgs": ["-r", "ts-node/register"],
+      "envFile": "${workspaceFolder}/.env",
+      "sourceMaps": true,
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"]
+    }
+  ],
+  "inputs": [
+    {
+      "type": "pickString",
+      "id": "entryFile",
+      "description": "Select the entry file for your application",
+      "options": ["src/main.ts", "libs/shared/src/index.ts"]
+    }
+  ]
+}
