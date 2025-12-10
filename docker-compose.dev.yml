@@ -1,0 +1,20 @@
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: db.dockerfile
+    container_name: nest_postgres
+    restart: always
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: default
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: opti_saas_db
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

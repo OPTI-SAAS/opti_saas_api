@@ -9,4 +9,4 @@ import { UserRepositoryProvider } from './user-repository.provider';
   providers: [TenantRepositoryProvider, UserRepositoryProvider],
   exports: [TenantRepositoryProvider, UserRepositoryProvider],
 })
-export class RepositoriesModule {} // TODO: prefix with BO
+export class BoRepositoriesModule {}

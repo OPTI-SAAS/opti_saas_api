@@ -1,6 +1,7 @@
 export * from './config';
 export * from './constants';
 export * from './decorators';
+export * from './dto';
 export * from './entities/backoffice';
 export * from './entities/client';
 export * from './exceptions';
@@ -8,3 +9,4 @@ export * from './filters';
 export * from './guards';
 export * from './helpers';
 export * from './interceptors';
+export * from './modules';

@@ -11,7 +11,7 @@ services:
     ports:
       - '5432:5432'
     environment:
-      - POSTGRES_DB=etoubib_db
+      - POSTGRES_DB=opti_saas_db
       - POSTGRES_USER=default
       - POSTGRES_PASSWORD=password
       - TZ=UTC

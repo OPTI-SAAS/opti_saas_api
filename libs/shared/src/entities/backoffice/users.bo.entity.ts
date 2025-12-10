@@ -1,6 +1,6 @@
 import { bycryptHashPassword, comparePassword } from '@lib/shared/helpers';
 import { Exclude } from 'class-transformer';
-import { Column, Entity, ManyToOne, OneToMany, OneToOne } from 'typeorm';
+import { Column, Entity, OneToMany, OneToOne } from 'typeorm';
 
 import { BaseEntity } from '../../base';
 import { BoTenantGroup } from './tenant-groups.bo.entity';
@@ -32,14 +32,6 @@ export class BoUser extends BaseEntity {
   })
   @Exclude()
   private _password!: string;
-
-  @Column({ name: 'tenant_group_id' })
-  tenantGroupId!: string;
-
-  @ManyToOne(() => BoTenantGroup, (group) => group.users, {
-    onDelete: 'RESTRICT',
-  })
-  tenantGroup!: BoTenantGroup;
 
   // is this user the owner of his tenant group
   @Column({ type: 'boolean', name: 'is_owner', default: false })

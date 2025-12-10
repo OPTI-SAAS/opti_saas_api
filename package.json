@@ -19,7 +19,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": ". ~/.nvm/nvm.sh && nvm use && env-cmd -f ./.env.test jest --detectOpenHandles --config ./test/jest-e2e.json",
     "prepare-test:e2e": "npm run docker:compose-up && sleep 5 && env-cmd -f ./.env.test npm run typeorm migration:run",
-    "docker:compose-up": "docker-compose -f docker-compose.yml up --build",
+    "docker:compose-up": "docker-compose -f docker-compose.dev.yml up --build",
     "migration:generate": "ts-node -r tsconfig-paths/register ./scripts/migrations/generateMigrations.ts $SCHEMA_NAME",
     "migration:run:all": "ts-node -r tsconfig-paths/register ./scripts/migrations/runMigrations.ts",
     "migration:run": "ts-node -r tsconfig-paths/register ./scripts/migrations/runSpecificMigration.ts $SCHEMA_NAME",

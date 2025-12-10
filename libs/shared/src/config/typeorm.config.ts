@@ -19,9 +19,10 @@ export const getDBSourceOptions = (
           },
         },
       };
+  const url = innerConfigService.get<string>('TYPEORM_URL')!;
   return {
     type: 'postgres',
-    url: innerConfigService.get<string>('TYPEORM_URL'),
+    url,
     logging: true,
     synchronize: false,
     migrationsRun: false,

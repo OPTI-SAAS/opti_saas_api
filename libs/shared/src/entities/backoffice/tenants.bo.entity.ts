@@ -1,17 +1,15 @@
 import { BaseEntity } from '@lib/shared/base';
-import { Column, Entity, ManyToOne, OneToMany } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 import { BoTenantGroup } from './tenant-groups.bo.entity';
 import { BoUserTenant } from './user-tenants.bo.entity';
 
 @Entity('tenants', { schema: 'backoffice' })
 export class BoTenant extends BaseEntity {
-  @Column({ name: 'tenant_group_id' })
-  tenantGroupId!: string;
-
   @ManyToOne(() => BoTenantGroup, (g) => g.tenants, {
     onDelete: 'CASCADE',
   })
+  @JoinColumn({ name: 'tenant_group_id' })
   tenantGroup!: BoTenantGroup;
 
   @OneToMany(() => BoUserTenant, (ut) => ut.tenant)

@@ -8,7 +8,7 @@ export function isBcryptHash(value: string): boolean {
 
 export async function bycryptHashPassword(password: string): Promise<string> {
   if (isBcryptHash(password)) return password;
-  const salt = await genSalt();
+  const salt = await genSalt(12);
   return await hash(password, salt);
 }
 

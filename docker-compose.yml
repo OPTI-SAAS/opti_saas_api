@@ -12,7 +12,7 @@ services:
     environment:
       POSTGRES_USER: default
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: etoubib_db
+      POSTGRES_DB: opti_saas_db
       TZ: UTC
       PGTZ: UTC
     volumes:
