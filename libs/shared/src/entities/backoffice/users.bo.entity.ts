@@ -33,6 +33,15 @@ export class BoUser extends BaseEntity {
   @Exclude()
   private _password!: string;
 
+  @Column({
+    type: 'varchar',
+    name: 'refresh_token',
+    length: 500,
+    nullable: true,
+  })
+  @Exclude()
+  refreshToken?: string;
+
   // is this user the owner of his tenant group
   @Column({ type: 'boolean', name: 'is_owner', default: false })
   isOwner!: boolean;

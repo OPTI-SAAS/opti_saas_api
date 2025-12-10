@@ -4,8 +4,10 @@ import { BoUserWithRelationsResponseDto } from './bo';
 import { UserResponseDto } from './client';
 
 export class UserLoginResponseDto<T> {
-  @ApiProperty({ example: { accessToken: 'token' } })
-  tokens!: { accessToken: string };
+  @ApiProperty({
+    example: { accessToken: 'token', refreshToken: 'refresh_token' },
+  })
+  tokens!: { accessToken: string; refreshToken: string };
 
   @ApiProperty()
   user!: T;

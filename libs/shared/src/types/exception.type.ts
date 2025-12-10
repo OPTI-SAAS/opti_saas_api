@@ -1,4 +1,4 @@
-import { ExtractEnumTypes } from './helpers';
+import { ExtractEnumTypes } from '../helpers';
 
 export const DBErrorCode = {
   PgUniqueConstraintViolation: '23505',
