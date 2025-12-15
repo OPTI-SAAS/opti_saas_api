@@ -1,6 +1,13 @@
 import { bycryptHashPassword, comparePassword } from '@lib/shared/helpers';
 import { Exclude } from 'class-transformer';
-import { Column, Entity, OneToMany, OneToOne } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  OneToOne,
+} from 'typeorm';
 
 import { BaseEntity } from '../../base';
 import { BoTenantGroup } from './tenant-groups.bo.entity';
@@ -42,10 +49,6 @@ export class BoUser extends BaseEntity {
   @Exclude()
   refreshToken?: string;
 
-  // is this user the owner of his tenant group
-  @Column({ type: 'boolean', name: 'is_owner', default: false })
-  isOwner!: boolean;
-
   // reverse relation for the group where he's owner
   @OneToOne(() => BoTenantGroup, (group) => group.owner)
   ownedTenantGroup!: BoTenantGroup;
@@ -53,6 +56,18 @@ export class BoUser extends BaseEntity {
   // memberships to specific tenants inside his group
   @OneToMany(() => BoUserTenant, (ut) => ut.user)
   tenantMemberships!: BoUserTenant[];
+
+  @Column({
+    name: 'tenant_group_id',
+    type: 'uuid',
+    nullable: true,
+    unique: false,
+  })
+  tenantGroupId!: string;
+
+  @ManyToOne(() => BoTenantGroup, { nullable: true })
+  @JoinColumn({ name: 'tenant_group_id' })
+  tenantGroup!: BoTenantGroup;
 
   constructor(data: Partial<BoUser> = {}) {
     super();

@@ -14,7 +14,11 @@ export const getClientSourceOptions = (
 ): PostgresConnectionOptions => ({
   ...getDBSourceOptions(innerConfigService),
   entities: [
-    path.resolve(__dirname, '../entities/client/*.client.entity.{js,ts}'),
+    path.resolve(
+      __dirname,
+      '../entities/client/*.client.{entity,view}.{js,ts}',
+    ),
+    path.resolve(__dirname, '../entities/backoffice/*.bo.entity.{js,ts}'),
   ],
   migrations: [
     path.resolve(__dirname, '../migrations/client/*-migration.{js,ts}'),
