@@ -12,7 +12,20 @@ const globalPrefix = 'api';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.enableCors();
+  app.enableCors({
+    origin: true, // Reflects the request origin, allowing all origins
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+    ],
+    credentials: true, // Allow cookies and credentials
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  });
   app
     .setGlobalPrefix(globalPrefix)
     .useGlobalInterceptors(new TransformInterceptor())
