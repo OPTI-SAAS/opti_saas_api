@@ -152,4 +152,32 @@ export class AuthService {
   async validateUser(userId: string): Promise<BoUser | null> {
     return this.userRepository.findOne({ where: { id: userId } });
   }
+
+  async getMe(userId: string) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['tenantMemberships', 'tenantMemberships.tenant'],
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const tenants = user.tenantMemberships.map((membership) => ({
+      id: membership.tenant.id,
+      name: membership.tenant.name,
+      dbSchema: membership.tenant.dbSchema,
+    }));
+
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      isOwner: user.isOwner,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      tenants,
+    };
+  }
 }
