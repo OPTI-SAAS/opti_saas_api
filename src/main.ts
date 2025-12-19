@@ -32,6 +32,17 @@ async function bootstrap() {
     .setTitle('Etoubib Api')
     .setDescription('Documentation of Etoubib Api')
     .setVersion('0.1')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'Authorization',
+        description: 'Enter your JWT token',
+        in: 'header',
+      },
+      'access-token',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
