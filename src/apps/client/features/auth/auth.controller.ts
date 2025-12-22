@@ -2,8 +2,8 @@ import {
   ClientController,
   CurrentUser,
   JwtAuthGuard,
-  MeResponseDataDto,
   TenantUserGuard,
+  UserMeResponseDto,
 } from '@lib/shared';
 import { Body, Get, Post, UseGuards } from '@nestjs/common';
 import {
@@ -57,7 +57,7 @@ Retrieves the profile information of the currently authenticated user along with
   })
   @ApiOkResponse({
     description: 'Successfully retrieved user profile with tenants',
-    type: MeResponseDataDto,
+    type: UserMeResponseDto,
   })
   @ApiUnauthorizedResponse({
     description: 'Unauthorized - Invalid or missing JWT token',

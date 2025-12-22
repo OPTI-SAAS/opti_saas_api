@@ -40,15 +40,3 @@ export class UserMeResponseDto extends BaseResponseDto {
   })
   tenants!: TenantResponseDto[];
 }
-
-/**
- * Wrapper DTO for the /auth/me endpoint response data.
- */
-export class MeResponseDataDto {
-  @ApiProperty({
-    description:
-      'Current authenticated user information including tenant memberships',
-    type: UserMeResponseDto,
-  })
-  user!: UserMeResponseDto;
-}

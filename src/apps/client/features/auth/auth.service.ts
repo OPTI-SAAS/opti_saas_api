@@ -53,13 +53,8 @@ export class AuthService {
     await this.userRepository.save(user);
 
     return {
-      tokens: { accessToken, refreshToken },
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      },
+      accessToken,
+      refreshToken,
     };
   }
 
@@ -106,13 +101,8 @@ export class AuthService {
       await this.userRepository.save(user);
 
       return {
-        tokens: { accessToken, refreshToken: newRefreshToken },
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-        },
+        accessToken,
+        refreshToken: newRefreshToken,
       };
     } catch (error) {
       throw new UnauthorizedException('Invalid refresh token');
