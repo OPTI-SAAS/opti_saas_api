@@ -42,7 +42,7 @@ export class AuthService {
     }
 
     // Generate JWT tokens
-    const payload = { sub: user.id, email: user.email };
+    const payload = { sub: user.id, email: user.email, isOwner: user.isOwner };
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload),
       this.generateRefreshToken(payload),
@@ -53,7 +53,14 @@ export class AuthService {
     await this.userRepository.save(user);
 
     return {
-      tokens: { accessToken, refreshToken },
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
     };
   }
 
@@ -89,7 +96,11 @@ export class AuthService {
       }
 
       // Generate new tokens
-      const newPayload = { sub: user.id, email: user.email };
+      const newPayload = {
+        sub: user.id,
+        email: user.email,
+        isOwner: user.isOwner,
+      };
       const [accessToken, newRefreshToken] = await Promise.all([
         this.jwtService.signAsync(newPayload),
         this.generateRefreshToken(newPayload),
@@ -100,13 +111,8 @@ export class AuthService {
       await this.userRepository.save(user);
 
       return {
-        tokens: { accessToken, refreshToken: newRefreshToken },
-        user: {
-          id: user.id,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-        },
+        accessToken,
+        refreshToken: newRefreshToken,
       };
     } catch (error) {
       throw new UnauthorizedException('Invalid refresh token');
@@ -129,6 +135,7 @@ export class AuthService {
   private async generateRefreshToken(payload: {
     sub: string;
     email: string;
+    isOwner: boolean;
   }): Promise<string> {
     const refreshSecret = this.configService.get<string>(
       'jwt.client.refresh_secret',
@@ -145,5 +152,33 @@ export class AuthService {
 
   async validateUser(userId: string): Promise<BoUser | null> {
     return this.userRepository.findOne({ where: { id: userId } });
+  }
+
+  async getMe(userId: string) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['tenantMemberships', 'tenantMemberships.tenant'],
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const tenants = user.tenantMemberships.map((membership) => ({
+      id: membership.tenant.id,
+      name: membership.tenant.name,
+      dbSchema: membership.tenant.dbSchema,
+    }));
+
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      isOwner: user.isOwner,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      tenants,
+    };
   }
 }

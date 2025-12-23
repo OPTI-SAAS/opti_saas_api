@@ -46,6 +46,6 @@ export class CreateUserDto {
     ({ value }) =>
       value === 'true' || value === true || value === 1 || value === '1',
   )
-  @ApiProperty({ example: 'true' })
-  isOwner?: boolean;
+  @ApiProperty({ example: false, default: false })
+  isOwner?: boolean = false;
 }

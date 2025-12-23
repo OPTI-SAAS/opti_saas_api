@@ -16,6 +16,17 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors({
     origin: '*',
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'Origin',
+    ],
+    credentials: true, // Allow cookies and credentials
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   });
   app
     .setGlobalPrefix(globalPrefix)
@@ -39,6 +50,17 @@ async function bootstrap() {
   const clientOptions = new DocumentBuilder()
     .setTitle('Client Opti Saas Api')
     .setVersion('0.1')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'Authorization',
+        description: 'Enter your JWT token',
+        in: 'header',
+      },
+      'access-token',
+    )
     .build();
 
   const backofficeDocumentFactory = () =>

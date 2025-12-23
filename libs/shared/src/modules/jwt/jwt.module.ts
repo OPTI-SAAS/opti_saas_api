@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { StringValue } from 'ms';
 
 @Module({
   imports: [
@@ -10,7 +11,7 @@ import { JwtModule } from '@nestjs/jwt';
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('jwt.client.secret'),
         signOptions: {
-          expiresIn: configService.get<number>('jwt.client.expires_in'),
+          expiresIn: configService.get<StringValue>('jwt.client.expires_in'),
         },
       }),
     }),
