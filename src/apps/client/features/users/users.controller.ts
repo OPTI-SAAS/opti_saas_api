@@ -2,6 +2,7 @@ import {
   BoUser,
   ClientController,
   CurrentOwner,
+  CurrentTenant,
   CurrentUser,
   JwtAuthGuard,
   OwnerGuard,
@@ -22,6 +23,7 @@ import {
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiHeader,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -34,6 +36,14 @@ import {
   UserWithTenantsResponseDto,
 } from './dto';
 import { UsersService } from './users.service';
+
+const TENANT_HEADER_SCHEMA = {
+  name: 'x-tenant-id',
+  description:
+    'Tenant ID to filter results by. Must be a UUID of a tenant the user has access to.',
+  required: false,
+  schema: { type: 'string', format: 'uuid' },
+};
 
 @ApiTags('Users')
 @ClientController('users')
@@ -55,35 +65,46 @@ export class UsersController {
   @Get()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get all users with pagination' })
+  @ApiHeader(TENANT_HEADER_SCHEMA)
   @ApiOkResponse({ type: PaginatedUsersResponseDto })
   async findAll(
     @Query() query: PaginationQueryDto,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(false) tenantId?: string,
   ) {
-    return this.usersService.findAllForUser(query, user.userId);
+    return this.usersService.findAllForUser(query, user.userId, tenantId);
   }
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get a specific user by ID' })
+  @ApiHeader(TENANT_HEADER_SCHEMA)
   @ApiOkResponse({ type: UserWithTenantsResponseDto })
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(false) tenantId?: string,
   ) {
-    return this.usersService.findOneForUser(id, user.userId);
+    return this.usersService.findOneForUser(id, user.userId, tenantId);
   }
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Update a user' })
+  @ApiHeader(TENANT_HEADER_SCHEMA)
   @ApiOkResponse({ type: UserWithTenantsResponseDto })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateUserDto: UpdateUserDto,
     @CurrentUser() user: AuthenticatedUser,
+    @CurrentTenant(false) tenantId?: string,
   ) {
-    return this.usersService.updateForUser(id, updateUserDto, user.userId);
+    return this.usersService.updateForUser(
+      id,
+      updateUserDto,
+      user.userId,
+      tenantId,
+    );
   }
 
   @Delete(':id')

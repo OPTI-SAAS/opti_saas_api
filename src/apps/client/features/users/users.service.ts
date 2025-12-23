@@ -12,7 +12,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 
 import { CreateUserDto, UpdateUserDto } from './dto';
 
@@ -199,30 +199,36 @@ export class UsersService {
 
       if (tenantIds !== undefined) {
         await manager.delete(BoUserTenant, { userId: id });
-
-        if (tenantIds.length > 0) {
-          const userTenants = tenantIds.map((tenantId) => {
-            const userTenant = new BoUserTenant();
-            userTenant.userId = id;
-            userTenant.tenantId = tenantId;
-            return userTenant;
-          });
-          await manager.save(userTenants);
-        }
+        await this.assignUserToTenants(id, tenantIds, manager);
       }
     });
 
     return this.findOne(id, owner);
   }
 
-  async findAllForUser(query: PaginationQueryDto, currentUserId: string) {
+  async findAllForUser(
+    query: PaginationQueryDto,
+    currentUserId: string,
+    tenantId?: string,
+  ) {
     const { page = 1, limit = 10 } = query;
     const currentUser = await this.findCurrentUser(currentUserId);
+
+    // If tenantId is provided, filter by that specific tenant
+    if (tenantId) {
+      // Verify user has access to this tenant
+      const accessibleTenantIds = this.getAccessibleTenantIds(currentUser);
+      if (!accessibleTenantIds.includes(tenantId)) {
+        throw new ForbiddenException('You do not have access to this tenant');
+      }
+      return this.findPaginatedUsersByTenants([tenantId], page, limit);
+    }
+
     const accessibleTenantIds = this.getAccessibleTenantIds(currentUser);
     return this.findPaginatedUsersByTenants(accessibleTenantIds, page, limit);
   }
 
-  async findOneForUser(id: string, currentUserId: string) {
+  async findOneForUser(id: string, currentUserId: string, tenantId?: string) {
     const currentUser = await this.findCurrentUser(currentUserId);
     const targetUser = await this.findUserWithRelations(id);
 
@@ -230,7 +236,24 @@ export class UsersService {
       throw new NotFoundException(`User with id ${id} not found`);
     }
 
-    this.verifyUserAccess(targetUser, currentUser);
+    // If tenantId is provided, verify user belongs to that tenant
+    if (tenantId) {
+      const accessibleTenantIds = this.getAccessibleTenantIds(currentUser);
+      if (!accessibleTenantIds.includes(tenantId)) {
+        throw new ForbiddenException('You do not have access to this tenant');
+      }
+
+      const targetTenantIds =
+        targetUser.tenantMemberships?.map((m) => m.tenant.id) || [];
+      if (!targetTenantIds.includes(tenantId)) {
+        throw new NotFoundException(
+          `User with id ${id} not found in the specified tenant`,
+        );
+      }
+    } else {
+      this.verifyUserAccess(targetUser, currentUser);
+    }
+
     return this.mapUserToResponse(targetUser);
   }
 
@@ -238,12 +261,29 @@ export class UsersService {
     id: string,
     updateUserDto: UpdateUserDto,
     currentUserId: string,
+    tenantId?: string,
   ) {
     const currentUser = await this.findCurrentUser(currentUserId);
     const targetUser = await this.findUserWithRelations(id);
 
     if (!targetUser) {
       throw new NotFoundException(`User with id ${id} not found`);
+    }
+
+    // If tenantId is provided, verify access through that tenant
+    if (tenantId) {
+      const accessibleTenantIds = this.getAccessibleTenantIds(currentUser);
+      if (!accessibleTenantIds.includes(tenantId)) {
+        throw new ForbiddenException('You do not have access to this tenant');
+      }
+
+      const targetTenantIds =
+        targetUser.tenantMemberships?.map((m) => m.tenant.id) || [];
+      if (!targetTenantIds.includes(tenantId)) {
+        throw new NotFoundException(
+          `User with id ${id} not found in the specified tenant`,
+        );
+      }
     }
 
     const isOwnProfile = currentUserId === id;
@@ -253,11 +293,12 @@ export class UsersService {
       throw new ForbiddenException('You can only update your own profile');
     }
 
-    if (!isOwnProfile && isOwner) {
+    if (!isOwnProfile && isOwner && !tenantId) {
       this.verifyUserAccess(targetUser, currentUser);
     }
 
-    const { firstName, lastName, password, tenantIds } = updateUserDto;
+    const { firstName, lastName, password, currentPassword, tenantIds } =
+      updateUserDto;
 
     if (firstName !== undefined) targetUser.firstName = firstName;
     if (lastName !== undefined) targetUser.lastName = lastName;
@@ -268,6 +309,20 @@ export class UsersService {
           'Only the user can update their own password',
         );
       }
+
+      // Verify current password before allowing password change
+      if (!currentPassword) {
+        throw new BadRequestException(
+          'Current password is required to change password',
+        );
+      }
+
+      const isCurrentPasswordValid =
+        await targetUser.checkPassword(currentPassword);
+      if (!isCurrentPasswordValid) {
+        throw new ForbiddenException('Current password is incorrect');
+      }
+
       await targetUser.setPassword(password);
     }
 
@@ -275,16 +330,8 @@ export class UsersService {
       throw new ForbiddenException('Only owners can update tenant assignments');
     }
 
-    if (tenantIds !== undefined) {
-      const ownerTenantIds = this.getAccessibleTenantIds(currentUser);
-      const invalidTenant = tenantIds.find(
-        (tid) => !ownerTenantIds.includes(tid),
-      );
-      if (invalidTenant) {
-        throw new BadRequestException(
-          `Tenant with id ${invalidTenant} does not belong to your tenant group`,
-        );
-      }
+    if (tenantIds?.length) {
+      this.validateTenantIds(tenantIds, currentUser);
     }
 
     await this.boConnection.transaction(async (manager) => {
@@ -292,16 +339,11 @@ export class UsersService {
 
       if (tenantIds !== undefined) {
         await manager.delete(BoUserTenant, { userId: id });
-        if (tenantIds.length > 0) {
-          const userTenants = tenantIds.map((tenantId) =>
-            manager.create(BoUserTenant, { userId: id, tenantId }),
-          );
-          await manager.save(userTenants);
-        }
+        await this.assignUserToTenants(id, tenantIds, manager);
       }
     });
 
-    return this.findOneForUser(id, currentUserId);
+    return this.findOneForUser(id, currentUserId, tenantId);
   }
 
   async remove(id: string, owner: BoUser): Promise<{ message: string }> {
@@ -365,7 +407,10 @@ export class UsersService {
   private async assignUserToTenants(
     userId: string,
     tenantIds: string[],
+    manager?: import('typeorm').EntityManager,
   ): Promise<void> {
+    if (tenantIds.length === 0) return;
+
     const userTenants = tenantIds.map((tenantId) => {
       const userTenant = new BoUserTenant();
       userTenant.userId = userId;
@@ -373,6 +418,10 @@ export class UsersService {
       return userTenant;
     });
 
-    await this.userTenantRepository.save(userTenants);
+    if (manager) {
+      await manager.save(userTenants);
+    } else {
+      await this.userTenantRepository.save(userTenants);
+    }
   }
 }

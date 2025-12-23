@@ -16,4 +16,9 @@ export type AuthenticatedUser = {
 
 export interface AuthenticatedRequest extends Request {
   user?: AuthenticatedUser | BoUser;
+  /**
+   * The tenant ID extracted from the x-tenant-id header.
+   * Populated by TenantGuard when the guard is used.
+   */
+  tenantId?: string;
 }
