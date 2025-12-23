@@ -9,7 +9,7 @@ import {
 import { AuthenticatedRequest, AuthenticatedUser } from '../types';
 
 @Injectable()
-export class NonOwnerGuard implements CanActivate {
+export class RegularUserGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const user = request.user as AuthenticatedUser;

@@ -64,22 +64,50 @@ export class UsersService {
     return { data: [], meta: this.buildPaginationMeta(page, limit, 0) };
   }
 
-  private async getUserIdsFromTenants(tenantIds: string[]): Promise<string[]> {
-    if (tenantIds.length === 0) return [];
-
-    const userTenants = await this.userTenantRepository.find({
-      where: { tenantId: In(tenantIds) },
-      select: ['userId'],
-    });
-
-    return [...new Set(userTenants.map((ut) => ut.userId))];
-  }
-
   private getAccessibleTenantIds(user: BoUser): string[] {
     if (user.isOwner && user.ownedTenantGroup) {
       return user.ownedTenantGroup.tenants?.map((t) => t.id) || [];
     }
     return user.tenantMemberships?.map((m) => m.tenant.id) || [];
+  }
+
+  private async findPaginatedUsersByTenants(
+    tenantIds: string[],
+    page: number,
+    limit: number,
+  ) {
+    if (tenantIds.length === 0) {
+      return this.emptyPaginatedResponse(page, limit);
+    }
+
+    // Single query with subquery - avoids N+1 problem
+    const queryBuilder = this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.tenantMemberships', 'membership')
+      .leftJoinAndSelect('membership.tenant', 'tenant')
+      .where('user.isOwner = :isOwner', { isOwner: false })
+      .andWhere(
+        `user.id IN (
+          SELECT DISTINCT ut."userId" 
+          FROM bo_user_tenant ut 
+          WHERE ut."tenantId" IN (:...tenantIds)
+        )`,
+        { tenantIds },
+      )
+      .orderBy('user.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [data, total] = await queryBuilder.getManyAndCount();
+
+    const meta = this.buildPaginationMeta(page, limit, total);
+    if (meta.pages !== 0 && page > meta.pages) {
+      throw new NotFoundException(
+        `Page ${page} is out of range. There are only ${meta.pages} page(s) available.`,
+      );
+    }
+
+    return { data: data.map((u) => this.mapUserToResponse(u)), meta };
   }
 
   private async findUserWithRelations(id: string): Promise<BoUser | null> {
@@ -137,32 +165,7 @@ export class UsersService {
   async findAll(query: PaginationQueryDto, owner: BoUser) {
     const { page = 1, limit = 10 } = query;
     const ownerTenantIds = this.getAccessibleTenantIds(owner);
-
-    if (ownerTenantIds.length === 0) {
-      return this.emptyPaginatedResponse(page, limit);
-    }
-
-    const userIds = await this.getUserIdsFromTenants(ownerTenantIds);
-    if (userIds.length === 0) {
-      return this.emptyPaginatedResponse(page, limit);
-    }
-
-    const [data, total] = await this.userRepository.findAndCount({
-      where: { id: In(userIds), isOwner: false },
-      relations: ['tenantMemberships', 'tenantMemberships.tenant'],
-      take: limit,
-      skip: (page - 1) * limit,
-      order: { createdAt: 'DESC' },
-    });
-
-    const meta = this.buildPaginationMeta(page, limit, total);
-    if (meta.pages !== 0 && page > meta.pages) {
-      throw new NotFoundException(
-        `Page ${page} is out of range. There are only ${meta.pages} page(s) available.`,
-      );
-    }
-
-    return { data: data.map((u) => this.mapUserToResponse(u)), meta };
+    return this.findPaginatedUsersByTenants(ownerTenantIds, page, limit);
   }
 
   async findOne(id: string, owner: BoUser) {
@@ -186,17 +189,28 @@ export class UsersService {
     if (firstName !== undefined) user.firstName = firstName;
     if (lastName !== undefined) user.lastName = lastName;
 
-    await this.userRepository.save(user);
-
-    if (tenantIds !== undefined) {
-      if (tenantIds.length > 0) {
-        this.validateTenantIds(tenantIds, owner);
-      }
-      await this.userTenantRepository.delete({ userId: id });
-      if (tenantIds.length > 0) {
-        await this.assignUserToTenants(id, tenantIds);
-      }
+    // Validate before transaction
+    if (tenantIds?.length) {
+      this.validateTenantIds(tenantIds, owner);
     }
+
+    await this.boConnection.transaction(async (manager) => {
+      await manager.save(user);
+
+      if (tenantIds !== undefined) {
+        await manager.delete(BoUserTenant, { userId: id });
+
+        if (tenantIds.length > 0) {
+          const userTenants = tenantIds.map((tenantId) => {
+            const userTenant = new BoUserTenant();
+            userTenant.userId = id;
+            userTenant.tenantId = tenantId;
+            return userTenant;
+          });
+          await manager.save(userTenants);
+        }
+      }
+    });
 
     return this.findOne(id, owner);
   }
@@ -205,32 +219,7 @@ export class UsersService {
     const { page = 1, limit = 10 } = query;
     const currentUser = await this.findCurrentUser(currentUserId);
     const accessibleTenantIds = this.getAccessibleTenantIds(currentUser);
-
-    if (accessibleTenantIds.length === 0) {
-      return this.emptyPaginatedResponse(page, limit);
-    }
-
-    const userIds = await this.getUserIdsFromTenants(accessibleTenantIds);
-    if (userIds.length === 0) {
-      return this.emptyPaginatedResponse(page, limit);
-    }
-
-    const [data, total] = await this.userRepository.findAndCount({
-      where: { id: In(userIds), isOwner: false },
-      relations: ['tenantMemberships', 'tenantMemberships.tenant'],
-      take: limit,
-      skip: (page - 1) * limit,
-      order: { createdAt: 'DESC' },
-    });
-
-    const meta = this.buildPaginationMeta(page, limit, total);
-    if (meta.pages !== 0 && page > meta.pages) {
-      throw new NotFoundException(
-        `Page ${page} is out of range. There are only ${meta.pages} page(s) available.`,
-      );
-    }
-
-    return { data: data.map((u) => this.mapUserToResponse(u)), meta };
+    return this.findPaginatedUsersByTenants(accessibleTenantIds, page, limit);
   }
 
   async findOneForUser(id: string, currentUserId: string) {
@@ -282,13 +271,11 @@ export class UsersService {
       await targetUser.setPassword(password);
     }
 
-    if (tenantIds !== undefined) {
-      if (!isOwner) {
-        throw new ForbiddenException(
-          'Only owners can update tenant assignments',
-        );
-      }
+    if (tenantIds !== undefined && !isOwner) {
+      throw new ForbiddenException('Only owners can update tenant assignments');
+    }
 
+    if (tenantIds !== undefined) {
       const ownerTenantIds = this.getAccessibleTenantIds(currentUser);
       const invalidTenant = tenantIds.find(
         (tid) => !ownerTenantIds.includes(tid),
@@ -298,26 +285,28 @@ export class UsersService {
           `Tenant with id ${invalidTenant} does not belong to your tenant group`,
         );
       }
-
-      await this.userTenantRepository.delete({ userId: id });
-      if (tenantIds.length > 0) {
-        await this.assignUserToTenants(id, tenantIds);
-      }
     }
 
-    await this.userRepository.save(targetUser);
+    await this.boConnection.transaction(async (manager) => {
+      await manager.save(targetUser);
+
+      if (tenantIds !== undefined) {
+        await manager.delete(BoUserTenant, { userId: id });
+        if (tenantIds.length > 0) {
+          const userTenants = tenantIds.map((tenantId) =>
+            manager.create(BoUserTenant, { userId: id, tenantId }),
+          );
+          await manager.save(userTenants);
+        }
+      }
+    });
+
     return this.findOneForUser(id, currentUserId);
   }
 
   async remove(id: string, owner: BoUser): Promise<{ message: string }> {
     await this.findOne(id, owner);
-
-    const result = await this.userRepository.softDelete(id);
-    if (!result.affected) {
-      throw new BadRequestException(
-        `User with id ${id} not found or already deleted`,
-      );
-    }
+    await this.userRepository.softDelete(id);
 
     return { message: `User with id ${id} has been deleted` };
   }

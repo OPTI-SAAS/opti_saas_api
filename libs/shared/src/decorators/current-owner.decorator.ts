@@ -1,15 +1,21 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { Request } from 'express';
+import {
+  createParamDecorator,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
 
 import { BoUser } from '../entities/backoffice';
-
-interface RequestWithUser extends Request {
-  user?: BoUser;
-}
+import { AuthenticatedRequest } from '../types';
 
 export const CurrentOwner = createParamDecorator(
   (data: unknown, context: ExecutionContext): BoUser => {
-    const request = context.switchToHttp().getRequest<RequestWithUser>();
-    return request.user as BoUser;
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const user = request.user as BoUser | undefined;
+
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+
+    return user;
   },
 );

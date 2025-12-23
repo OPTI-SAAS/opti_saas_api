@@ -7,7 +7,7 @@ export class PaginationQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @ApiProperty({ example: 1, default: 1, required: false })
+  @ApiProperty({ example: 1, default: 1, minimum: 1, required: false })
   page?: number = 1;
 
   @IsOptional()
@@ -15,7 +15,13 @@ export class PaginationQueryDto {
   @IsInt()
   @Min(1)
   @Max(100)
-  @ApiProperty({ example: 10, default: 10, required: false })
+  @ApiProperty({
+    example: 10,
+    default: 10,
+    minimum: 1,
+    maximum: 100,
+    required: false,
+  })
   limit?: number = 10;
 }
 
