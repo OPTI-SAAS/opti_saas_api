@@ -7,13 +7,15 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { json, urlencoded } from 'body-parser';
 
 import { AppModule } from './apps/app.module';
+import { BackofficeModule } from './apps/backoffice/backoffice.module';
+import { ClientModule } from './apps/client/client.module';
 
 const globalPrefix = 'api';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableCors({
-    origin: true, // Reflects the request origin, allowing all origins
+    origin: '*',
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
@@ -41,9 +43,12 @@ async function bootstrap() {
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
 
-  const config = new DocumentBuilder()
-    .setTitle('Etoubib Api')
-    .setDescription('Documentation of Etoubib Api')
+  const backofficeOptions = new DocumentBuilder()
+    .setTitle('Backoffice Opti Saas Api')
+    .setVersion('0.1')
+    .build();
+  const clientOptions = new DocumentBuilder()
+    .setTitle('Client Opti Saas Api')
     .setVersion('0.1')
     .addBearerAuth(
       {
@@ -58,8 +63,19 @@ async function bootstrap() {
     )
     .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  const backofficeDocumentFactory = () =>
+    SwaggerModule.createDocument(app, backofficeOptions, {
+      include: [BackofficeModule],
+      deepScanRoutes: true,
+    });
+  const clientDocumentFactory = () =>
+    SwaggerModule.createDocument(app, clientOptions, {
+      include: [ClientModule],
+      deepScanRoutes: true,
+    });
+
+  SwaggerModule.setup('api/backoffice', app, backofficeDocumentFactory);
+  SwaggerModule.setup('api/client', app, clientDocumentFactory);
 
   const configService = app.get<ConfigService>(ConfigService);
   const port = configService.get<number>('app.port') || 3000;

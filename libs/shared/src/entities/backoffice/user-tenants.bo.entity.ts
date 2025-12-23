@@ -7,10 +7,10 @@ import { BoUser } from './users.bo.entity';
 @Entity('user_tenants', { schema: 'backoffice' })
 @Unique(['userId', 'tenantId'])
 export class BoUserTenant extends BaseEntity {
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id', type: 'uuid' })
   userId!: string;
 
-  @Column({ name: 'tenant_id' })
+  @Column({ name: 'tenant_id', type: 'uuid' })
   tenantId!: string;
 
   @ManyToOne(() => BoUser, (user) => user.tenantMemberships, {

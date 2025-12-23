@@ -1,4 +1,4 @@
-name: CI/CD for Etoubib Api
+name: CI/CD for Opti Saas Api
 
 on:
   push:
@@ -7,9 +7,9 @@ on:
       - staging
 
 env:
-  DOCKER_IMAGE: etoubib-api
-  DOCKER_IMAGE_BLUE: etoubib-api-blue
-  DOCKER_IMAGE_GREEN: etoubib-api-green
+  DOCKER_IMAGE: opti-saas-api
+  DOCKER_IMAGE_BLUE: opti-saas-api-blue
+  DOCKER_IMAGE_GREEN: opti-saas-api-green
 
 jobs:
   test:
@@ -55,7 +55,7 @@ jobs:
 
       - name: Build Docker image for migration
         run: |
-          docker build -t etoubib-migration-build -f migration.dockerfile .
+          docker build -t opti-saas-migration-build -f migration.dockerfile .
 
   migration:
     strategy:
@@ -71,7 +71,7 @@ jobs:
 
       - name: Run migration inside Docker container
         run: |
-          docker run -e TYPEORM_URL=${{ secrets.TYPEORM_URL }} etoubib-migration-build
+          docker run -e TYPEORM_URL=${{ secrets.TYPEORM_URL }} opti-saas-migration-build
 
   build_app:
     strategy:

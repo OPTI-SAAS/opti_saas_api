@@ -34,6 +34,9 @@ importers:
       '@nestjs/typeorm':
         specifier: ^11.0.0
         version: 11.0.0(@nestjs/common@11.1.9(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.9)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.28(pg@8.16.3)(ts-node@10.9.2(@swc/core@1.15.3)(@types/node@22.19.1)(typescript@5.9.3)))
+      '@optisaas/opti-saas-lib':
+        specifier: ^0.1.6
+        version: 0.1.6
       '@types/body-parser':
         specifier: ^1.19.5
         version: 1.19.6
@@ -55,9 +58,6 @@ importers:
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1
-      etoubib-shared:
-        specifier: ^1.0.2
-        version: 1.1.0
       lodash:
         specifier: ^4.17.21
         version: 4.17.21
@@ -1410,6 +1410,13 @@ packages:
       }
     engines: { node: ^14.18.0 || >=16.10.0, npm: '>=5.10.0' }
     hasBin: true
+
+  '@optisaas/opti-saas-lib@0.1.6':
+    resolution:
+      {
+        integrity: sha512-X1kc1Vq20OmiSExCWYdOYbMR5gYhmhYkqBoaFK37K3OPv2j5pcpbdqsXux0TndJXvCGR4ooBm74FX4UZWGMtKQ==,
+      }
+    engines: { node: '>=18' }
 
   '@paralleldrive/cuid2@2.3.1':
     resolution:
@@ -3410,12 +3417,6 @@ packages:
         integrity: sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg==,
       }
     engines: { node: '>= 0.6' }
-
-  etoubib-shared@1.1.0:
-    resolution:
-      {
-        integrity: sha512-VwPm9syvPelTVeX+kNxFzCacFpyyC+VLOSvsPJRzzG3tot25jwKKwbwbyvvhzxF2G7GnvhaYDZVLLQS+jC5ubQ==,
-      }
 
   eventemitter2@6.4.9:
     resolution:
@@ -7600,6 +7601,8 @@ snapshots:
     dependencies:
       consola: 3.4.2
 
+  '@optisaas/opti-saas-lib@0.1.6': {}
+
   '@paralleldrive/cuid2@2.3.1':
     dependencies:
       '@noble/hashes': 1.8.0
@@ -8859,8 +8862,6 @@ snapshots:
   esutils@2.0.3: {}
 
   etag@1.8.1: {}
-
-  etoubib-shared@1.1.0: {}
 
   eventemitter2@6.4.9: {}
 

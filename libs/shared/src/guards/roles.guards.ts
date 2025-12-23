@@ -7,7 +7,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ResourceAuthorizations } from 'etoubib-shared';
+import { ResourceAuthorizations } from '@optisaas/opti-saas-lib';
 import { Request } from 'express';
 
 const AUTHORIZE_METADATA_KEY = 'AUTHORIZE_METADATA_KEY';
