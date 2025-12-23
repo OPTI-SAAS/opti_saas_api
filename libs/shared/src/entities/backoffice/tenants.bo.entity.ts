@@ -6,6 +6,9 @@ import { BoUserTenant } from './user-tenants.bo.entity';
 
 @Entity('tenants', { schema: 'backoffice' })
 export class BoTenant extends BaseEntity {
+  @Column({ name: 'tenant_group_id', type: 'uuid' })
+  tenantGroupId!: string;
+
   @ManyToOne(() => BoTenantGroup, (g) => g.tenants, {
     onDelete: 'CASCADE',
   })
@@ -15,9 +18,9 @@ export class BoTenant extends BaseEntity {
   @OneToMany(() => BoUserTenant, (ut) => ut.tenant)
   userMemberships!: BoUserTenant[];
 
-  @Column({ name: 'db_schema', unique: true, nullable: true })
+  @Column({ name: 'db_schema', type: 'varchar', unique: true, nullable: true })
   dbSchema!: string;
 
-  @Column({ name: 'name', unique: true })
+  @Column({ name: 'name', type: 'varchar', unique: true })
   name!: string;
 }
