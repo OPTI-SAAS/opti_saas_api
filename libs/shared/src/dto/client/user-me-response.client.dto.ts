@@ -28,8 +28,7 @@ export class UserMeResponseDto extends BaseResponseDto {
   lastName!: string;
 
   @ApiProperty({
-    description:
-      'Indicates if the user is an owner. Always false for this endpoint as owners are blocked.',
+    description: 'Indicates if the user is an owner',
     example: false,
   })
   isOwner!: boolean;
