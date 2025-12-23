@@ -35,7 +35,7 @@ export class UsersService {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
-      isOwner: user.isOwner,
+      // isOwner: user.isOwner,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       deletedAt: user.deletedAt || null,
@@ -65,7 +65,7 @@ export class UsersService {
   }
 
   private getAccessibleTenantIds(user: BoUser): string[] {
-    if (user.isOwner && user.ownedTenantGroup) {
+    if (/* user.isOwner && */ user.ownedTenantGroup) {
       return user.ownedTenantGroup.tenants?.map((t) => t.id) || [];
     }
     return user.tenantMemberships?.map((m) => m.tenant.id) || [];
@@ -170,7 +170,7 @@ export class UsersService {
 
   async findOne(id: string, owner: BoUser) {
     const user = await this.userRepository.findOne({
-      where: { id, isOwner: false },
+      where: { id /* isOwner: false */ },
       relations: ['tenantMemberships', 'tenantMemberships.tenant'],
     });
 
@@ -287,13 +287,13 @@ export class UsersService {
     }
 
     const isOwnProfile = currentUserId === id;
-    const { isOwner } = currentUser;
+    // const { isOwner } = currentUser;
 
-    if (!isOwnProfile && !isOwner) {
+    if (!isOwnProfile /* && !isOwner */) {
       throw new ForbiddenException('You can only update your own profile');
     }
 
-    if (!isOwnProfile && isOwner && !tenantId) {
+    if (!isOwnProfile /* && isOwner */ && !tenantId) {
       this.verifyUserAccess(targetUser, currentUser);
     }
 
@@ -326,13 +326,13 @@ export class UsersService {
       await targetUser.setPassword(password);
     }
 
-    if (tenantIds !== undefined && !isOwner) {
+    if (tenantIds !== undefined /* && !isOwner */) {
       throw new ForbiddenException('Only owners can update tenant assignments');
     }
 
-    if (tenantIds?.length) {
-      this.validateTenantIds(tenantIds, currentUser);
-    }
+    // if (tenantIds?.length) {
+    //   this.validateTenantIds(tenantIds, currentUser);
+    // }
 
     await this.boConnection.transaction(async (manager) => {
       await manager.save(targetUser);
@@ -355,7 +355,7 @@ export class UsersService {
 
   private async getUserEntity(id: string, owner: BoUser): Promise<BoUser> {
     const user = await this.userRepository.findOne({
-      where: { id, isOwner: false },
+      where: { id /* isOwner: false */ },
       relations: ['tenantMemberships', 'tenantMemberships.tenant'],
     });
 

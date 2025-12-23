@@ -93,11 +93,12 @@ export class TenantGuard implements CanActivate {
     }
 
     // If user is owner, check if tenant belongs to their tenant group
-    if (user.isOwner && user.ownedTenantGroup) {
-      const ownerTenantIds =
-        user.ownedTenantGroup.tenants?.map((t) => t.id) || [];
-      return ownerTenantIds.includes(tenantId);
-    }
+    // FIXME: Temporarily disabled owner check logic
+    // if (user.isOwner && user.ownedTenantGroup) {
+    //   const ownerTenantIds =
+    //     user.ownedTenantGroup.tenants?.map((t) => t.id) || [];
+    //   return ownerTenantIds.includes(tenantId);
+    // }
 
     // For regular users, check if they have membership in the tenant
     const userTenantIds = user.tenantMemberships?.map((m) => m.tenant.id) || [];

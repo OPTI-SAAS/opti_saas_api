@@ -42,7 +42,11 @@ export class AuthService {
     }
 
     // Generate JWT tokens
-    const payload = { sub: user.id, email: user.email, isOwner: user.isOwner };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      // isOwner: user.isOwner
+    };
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload),
       this.generateRefreshToken(payload),
@@ -99,7 +103,7 @@ export class AuthService {
       const newPayload = {
         sub: user.id,
         email: user.email,
-        isOwner: user.isOwner,
+        // isOwner: user.isOwner,
       };
       const [accessToken, newRefreshToken] = await Promise.all([
         this.jwtService.signAsync(newPayload),
@@ -135,7 +139,7 @@ export class AuthService {
   private async generateRefreshToken(payload: {
     sub: string;
     email: string;
-    isOwner: boolean;
+    // isOwner: boolean;
   }): Promise<string> {
     const refreshSecret = this.configService.get<string>(
       'jwt.client.refresh_secret',
@@ -175,7 +179,7 @@ export class AuthService {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      isOwner: user.isOwner,
+      // isOwner: user.isOwner,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       tenants,

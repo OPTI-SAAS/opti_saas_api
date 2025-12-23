@@ -1,6 +1,6 @@
 // import { BoClinic } from '../entities/backoffice';
 
-function _generateId(name: string, date: Date): string {
+export function _generateId(name: string, date: Date): string {
   const sanitizedName = name.toLowerCase().replace(/\s+/g, '');
   const timestamp = date.getTime();
   return `${sanitizedName}${timestamp}`;
