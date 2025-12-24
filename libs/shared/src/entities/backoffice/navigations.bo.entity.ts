@@ -4,8 +4,8 @@ import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 type RouteType = 'group' | 'sub-group' | 'group-link' | 'link';
 
-@Entity('routes', { schema: 'backoffice' })
-export class BoRoute extends BaseEntity {
+@Entity('navigations', { schema: 'backoffice' })
+export class BoNavigation extends BaseEntity {
   @Column({ name: '_type', type: 'varchar' })
   _type!: RouteType;
 
@@ -24,15 +24,15 @@ export class BoRoute extends BaseEntity {
   @Column({ type: 'uuid', name: 'parent_id', nullable: true })
   parentId?: string | null;
 
-  @OneToMany(() => BoRoute, (route) => route.parent)
-  childrens?: BoRoute[];
+  @OneToMany(() => BoNavigation, (route) => route.parent)
+  childrens?: BoNavigation[];
 
-  @ManyToOne(() => BoRoute, (route) => route.childrens, {
+  @ManyToOne(() => BoNavigation, (route) => route.childrens, {
     nullable: true,
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'parent_id' })
-  parent?: BoRoute;
+  parent?: BoNavigation;
 
   @Column('varchar', { name: 'authorizations_needed', array: true })
   authorizations_needed!: ResourceAuthorizations[];

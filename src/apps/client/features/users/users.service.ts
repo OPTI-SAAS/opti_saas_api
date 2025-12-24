@@ -65,9 +65,6 @@ export class UsersService {
   }
 
   private getAccessibleTenantIds(user: BoUser): string[] {
-    if (/* user.isOwner && */ user.ownedTenantGroup) {
-      return user.ownedTenantGroup.tenants?.map((t) => t.id) || [];
-    }
     return user.tenantMemberships?.map((m) => m.tenant.id) || [];
   }
 
