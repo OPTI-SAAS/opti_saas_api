@@ -1,5 +1,9 @@
 /* eslint-disable @typescript-eslint/no-floating-promises */
-import { HttpExceptionFilter, TransformInterceptor } from '@lib/shared';
+import {
+  HttpExceptionFilter,
+  TENANT_HEADER,
+  TransformInterceptor,
+} from '@lib/shared';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
@@ -23,6 +27,7 @@ async function bootstrap() {
       'X-Requested-With',
       'Accept',
       'Origin',
+      TENANT_HEADER,
     ],
     credentials: true, // Allow cookies and credentials
     preflightContinue: false,
