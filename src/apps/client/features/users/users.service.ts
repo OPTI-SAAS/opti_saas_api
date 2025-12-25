@@ -1,9 +1,4 @@
-import {
-  BACKOFFICE_CONNECTION,
-  BoUser,
-  BoUserTenant,
-  PaginationQueryDto,
-} from '@lib/shared';
+import { BACKOFFICE_CONNECTION, BoUser, PaginationQueryDto } from '@lib/shared';
 import {
   BadRequestException,
   ConflictException,
@@ -19,14 +14,12 @@ import { CreateUserDto, UpdateUserDto } from './dto';
 @Injectable()
 export class UsersService {
   private userRepository: Repository<BoUser>;
-  private userTenantRepository: Repository<BoUserTenant>;
 
   constructor(
     @Inject(BACKOFFICE_CONNECTION)
     private readonly boConnection: DataSource,
   ) {
     this.userRepository = this.boConnection.getRepository(BoUser);
-    this.userTenantRepository = this.boConnection.getRepository(BoUserTenant);
   }
 
   private mapUserToResponse(user: BoUser) {
@@ -35,16 +28,16 @@ export class UsersService {
       firstName: user.firstName,
       lastName: user.lastName,
       email: user.email,
-      // isOwner: user.isOwner,
+      tenantGroupId: user.tenantGroupId || null,
+      tenantGroup: user.tenantGroup
+        ? {
+            id: user.tenantGroup.id,
+            ownerId: user.tenantGroup.ownerId,
+          }
+        : null,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       deletedAt: user.deletedAt || null,
-      tenants:
-        user.tenantMemberships?.map((m) => ({
-          id: m.tenant.id,
-          name: m.tenant.name,
-          dbSchema: m.tenant.dbSchema,
-        })) || [],
     };
   }
 
@@ -64,33 +57,34 @@ export class UsersService {
     return { data: [], meta: this.buildPaginationMeta(page, limit, 0) };
   }
 
-  private getAccessibleTenantIds(user: BoUser): string[] {
-    return user.tenantMemberships?.map((m) => m.tenant.id) || [];
-  }
+  async create(createUserDto: CreateUserDto) {
+    const { firstName, lastName, email, password, tenantGroupId } =
+      createUserDto;
 
-  private async findPaginatedUsersByTenants(
-    tenantIds: string[],
-    page: number,
-    limit: number,
-  ) {
-    if (tenantIds.length === 0) {
-      return this.emptyPaginatedResponse(page, limit);
+    // Check if user with email already exists
+    const existingUser = await this.userRepository.findOne({
+      where: { email },
+    });
+
+    if (existingUser) {
+      throw new ConflictException('User with this email already exists');
     }
 
-    // Single query with subquery - avoids N+1 problem
+    const user = new BoUser();
+    Object.assign(user, { firstName, lastName, email, tenantGroupId });
+    await user.setPassword(password);
+
+    const savedUser = await this.userRepository.save(user);
+
+    return this.findOne(savedUser.id);
+  }
+
+  async findAll(query: PaginationQueryDto) {
+    const { page = 1, limit = 10 } = query;
+
     const queryBuilder = this.userRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.tenantMemberships', 'membership')
-      .leftJoinAndSelect('membership.tenant', 'tenant')
-      .where('user.isOwner = :isOwner', { isOwner: false })
-      .andWhere(
-        `user.id IN (
-          SELECT DISTINCT ut."userId" 
-          FROM bo_user_tenant ut 
-          WHERE ut."tenantId" IN (:...tenantIds)
-        )`,
-        { tenantIds },
-      )
+      .leftJoinAndSelect('user.tenantGroup', 'tenantGroup')
       .orderBy('user.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
@@ -107,198 +101,38 @@ export class UsersService {
     return { data: data.map((u) => this.mapUserToResponse(u)), meta };
   }
 
-  private async findUserWithRelations(id: string): Promise<BoUser | null> {
-    return this.userRepository.findOne({
+  async findOne(id: string) {
+    const user = await this.userRepository.findOne({
       where: { id },
-      relations: ['tenantMemberships', 'tenantMemberships.tenant'],
-    });
-  }
-
-  private async findCurrentUser(userId: string): Promise<BoUser> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: [
-        'tenantMemberships',
-        'tenantMemberships.tenant',
-        'ownedTenantGroup',
-        'ownedTenantGroup.tenants',
-      ],
-    });
-
-    if (!user) {
-      throw new NotFoundException('Current user not found');
-    }
-
-    return user;
-  }
-
-  async create(createUserDto: CreateUserDto, owner: BoUser) {
-    const { firstName, lastName, email, password, tenantIds } = createUserDto;
-
-    const existingUser = await this.userRepository.findOne({
-      where: { email },
-    });
-    if (existingUser) {
-      throw new ConflictException('User with this email already exists');
-    }
-
-    if (tenantIds?.length) {
-      this.validateTenantIds(tenantIds, owner);
-    }
-
-    const user = new BoUser();
-    Object.assign(user, { firstName, lastName, email, isOwner: false });
-    await user.setPassword(password);
-
-    const savedUser = await this.userRepository.save(user);
-
-    if (tenantIds?.length) {
-      await this.assignUserToTenants(savedUser.id, tenantIds);
-    }
-
-    return this.findOne(savedUser.id, owner);
-  }
-
-  async findAll(query: PaginationQueryDto, owner: BoUser) {
-    const { page = 1, limit = 10 } = query;
-    const ownerTenantIds = this.getAccessibleTenantIds(owner);
-    return this.findPaginatedUsersByTenants(ownerTenantIds, page, limit);
-  }
-
-  async findOne(id: string, owner: BoUser) {
-    const user = await this.userRepository.findOne({
-      where: { id /* isOwner: false */ },
-      relations: ['tenantMemberships', 'tenantMemberships.tenant'],
+      relations: ['tenantGroup'],
     });
 
     if (!user) {
       throw new NotFoundException(`User with id ${id} not found`);
     }
 
-    this.verifyUserBelongsToOwner(user, owner);
     return this.mapUserToResponse(user);
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto, owner: BoUser) {
-    const user = await this.getUserEntity(id, owner);
-    const { firstName, lastName, tenantIds } = updateUserDto;
-
-    if (firstName !== undefined) user.firstName = firstName;
-    if (lastName !== undefined) user.lastName = lastName;
-
-    // Validate before transaction
-    if (tenantIds?.length) {
-      this.validateTenantIds(tenantIds, owner);
-    }
-
-    await this.boConnection.transaction(async (manager) => {
-      await manager.save(user);
-
-      if (tenantIds !== undefined) {
-        await manager.delete(BoUserTenant, { userId: id });
-        await this.assignUserToTenants(id, tenantIds, manager);
-      }
-    });
-
-    return this.findOne(id, owner);
-  }
-
-  async findAllForUser(
-    query: PaginationQueryDto,
-    currentUserId: string,
-    tenantId?: string,
-  ) {
-    const { page = 1, limit = 10 } = query;
-    const currentUser = await this.findCurrentUser(currentUserId);
-
-    // If tenantId is provided, filter by that specific tenant
-    if (tenantId) {
-      // Verify user has access to this tenant
-      const accessibleTenantIds = this.getAccessibleTenantIds(currentUser);
-      if (!accessibleTenantIds.includes(tenantId)) {
-        throw new ForbiddenException('You do not have access to this tenant');
-      }
-      return this.findPaginatedUsersByTenants([tenantId], page, limit);
-    }
-
-    const accessibleTenantIds = this.getAccessibleTenantIds(currentUser);
-    return this.findPaginatedUsersByTenants(accessibleTenantIds, page, limit);
-  }
-
-  async findOneForUser(id: string, currentUserId: string, tenantId?: string) {
-    const currentUser = await this.findCurrentUser(currentUserId);
-    const targetUser = await this.findUserWithRelations(id);
-
-    if (!targetUser) {
-      throw new NotFoundException(`User with id ${id} not found`);
-    }
-
-    // If tenantId is provided, verify user belongs to that tenant
-    if (tenantId) {
-      const accessibleTenantIds = this.getAccessibleTenantIds(currentUser);
-      if (!accessibleTenantIds.includes(tenantId)) {
-        throw new ForbiddenException('You do not have access to this tenant');
-      }
-
-      const targetTenantIds =
-        targetUser.tenantMemberships?.map((m) => m.tenant.id) || [];
-      if (!targetTenantIds.includes(tenantId)) {
-        throw new NotFoundException(
-          `User with id ${id} not found in the specified tenant`,
-        );
-      }
-    } else {
-      this.verifyUserAccess(targetUser, currentUser);
-    }
-
-    return this.mapUserToResponse(targetUser);
-  }
-
-  async updateForUser(
+  async update(
     id: string,
     updateUserDto: UpdateUserDto,
     currentUserId: string,
-    tenantId?: string,
   ) {
-    const currentUser = await this.findCurrentUser(currentUserId);
-    const targetUser = await this.findUserWithRelations(id);
+    const user = await this.userRepository.findOne({
+      where: { id },
+      relations: ['tenantGroup'],
+    });
 
-    if (!targetUser) {
+    if (!user) {
       throw new NotFoundException(`User with id ${id} not found`);
     }
 
-    // If tenantId is provided, verify access through that tenant
-    if (tenantId) {
-      const accessibleTenantIds = this.getAccessibleTenantIds(currentUser);
-      if (!accessibleTenantIds.includes(tenantId)) {
-        throw new ForbiddenException('You do not have access to this tenant');
-      }
-
-      const targetTenantIds =
-        targetUser.tenantMemberships?.map((m) => m.tenant.id) || [];
-      if (!targetTenantIds.includes(tenantId)) {
-        throw new NotFoundException(
-          `User with id ${id} not found in the specified tenant`,
-        );
-      }
-    }
-
     const isOwnProfile = currentUserId === id;
-    // const { isOwner } = currentUser;
+    const { firstName, lastName, password, currentPassword } = updateUserDto;
 
-    if (!isOwnProfile /* && !isOwner */) {
-      throw new ForbiddenException('You can only update your own profile');
-    }
-
-    if (!isOwnProfile /* && isOwner */ && !tenantId) {
-      this.verifyUserAccess(targetUser, currentUser);
-    }
-
-    const { firstName, lastName, password, currentPassword, tenantIds } =
-      updateUserDto;
-
-    if (firstName !== undefined) targetUser.firstName = firstName;
-    if (lastName !== undefined) targetUser.lastName = lastName;
+    if (firstName !== undefined) user.firstName = firstName;
+    if (lastName !== undefined) user.lastName = lastName;
 
     if (password !== undefined) {
       if (!isOwnProfile) {
@@ -307,118 +141,36 @@ export class UsersService {
         );
       }
 
-      // Verify current password before allowing password change
       if (!currentPassword) {
         throw new BadRequestException(
           'Current password is required to change password',
         );
       }
 
-      const isCurrentPasswordValid =
-        await targetUser.checkPassword(currentPassword);
+      const isCurrentPasswordValid = await user.checkPassword(currentPassword);
       if (!isCurrentPasswordValid) {
         throw new ForbiddenException('Current password is incorrect');
       }
 
-      await targetUser.setPassword(password);
+      await user.setPassword(password);
     }
 
-    if (tenantIds !== undefined /* && !isOwner */) {
-      throw new ForbiddenException('Only owners can update tenant assignments');
-    }
+    await this.userRepository.save(user);
 
-    // if (tenantIds?.length) {
-    //   this.validateTenantIds(tenantIds, currentUser);
-    // }
-
-    await this.boConnection.transaction(async (manager) => {
-      await manager.save(targetUser);
-
-      if (tenantIds !== undefined) {
-        await manager.delete(BoUserTenant, { userId: id });
-        await this.assignUserToTenants(id, tenantIds, manager);
-      }
-    });
-
-    return this.findOneForUser(id, currentUserId, tenantId);
+    return this.findOne(id);
   }
 
-  async remove(id: string, owner: BoUser): Promise<{ message: string }> {
-    await this.findOne(id, owner);
-    await this.userRepository.softDelete(id);
-
-    return { message: `User with id ${id} has been deleted` };
-  }
-
-  private async getUserEntity(id: string, owner: BoUser): Promise<BoUser> {
+  async remove(id: string): Promise<{ message: string }> {
     const user = await this.userRepository.findOne({
-      where: { id /* isOwner: false */ },
-      relations: ['tenantMemberships', 'tenantMemberships.tenant'],
+      where: { id },
     });
 
     if (!user) {
       throw new NotFoundException(`User with id ${id} not found`);
     }
 
-    this.verifyUserBelongsToOwner(user, owner);
-    return user;
-  }
+    await this.userRepository.softDelete(id);
 
-  private validateTenantIds(tenantIds: string[], owner: BoUser): void {
-    const ownerTenantIds = this.getAccessibleTenantIds(owner);
-    const invalidTenant = tenantIds.find(
-      (tid) => !ownerTenantIds.includes(tid),
-    );
-    if (invalidTenant) {
-      throw new BadRequestException(
-        `Tenant with id ${invalidTenant} does not belong to your tenant group`,
-      );
-    }
-  }
-
-  private verifyUserBelongsToOwner(user: BoUser, owner: BoUser): void {
-    const ownerTenantIds = this.getAccessibleTenantIds(owner);
-    const userTenantIds = user.tenantMemberships?.map((m) => m.tenant.id) || [];
-
-    if (
-      userTenantIds.length > 0 &&
-      !userTenantIds.some((id) => ownerTenantIds.includes(id))
-    ) {
-      throw new NotFoundException(`User with id ${user.id} not found`);
-    }
-  }
-
-  private verifyUserAccess(targetUser: BoUser, currentUser: BoUser): void {
-    const accessibleTenantIds = this.getAccessibleTenantIds(currentUser);
-    const targetTenantIds =
-      targetUser.tenantMemberships?.map((m) => m.tenant.id) || [];
-
-    if (
-      targetTenantIds.length > 0 &&
-      !targetTenantIds.some((id) => accessibleTenantIds.includes(id))
-    ) {
-      throw new NotFoundException(`User with id ${targetUser.id} not found`);
-    }
-  }
-
-  private async assignUserToTenants(
-    userId: string,
-    tenantIds: string[],
-    manager?: import('typeorm').EntityManager,
-  ): Promise<void> {
-    if (tenantIds.length === 0) return;
-
-    const userTenants = tenantIds.map((tenantId) => {
-      const userTenant = new BoUserTenant();
-      userTenant.userId = userId;
-      userTenant.tenantId = tenantId;
-      return userTenant;
-    });
-
-    if (manager) {
-      await manager.save(userTenants);
-    } else {
-      await this.userTenantRepository.save(userTenants);
-    }
+    return { message: `User with id ${id} has been deleted` };
   }
 }

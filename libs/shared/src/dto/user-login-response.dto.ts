@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 import { BoUserWithRelationsResponseDto } from './bo';
-import { UserResponseDto } from './client';
+import { ClUserResponseDto } from './client';
 
 export class UserLoginResponseDto<T> {
   @ApiProperty({
@@ -16,4 +16,5 @@ export class UserLoginResponseDto<T> {
 export type BoUserLoginResponseDto =
   UserLoginResponseDto<BoUserWithRelationsResponseDto>;
 
-export type ClientUserLoginResponseDto = UserLoginResponseDto<UserResponseDto>;
+export type ClientUserLoginResponseDto =
+  UserLoginResponseDto<ClUserResponseDto>;

@@ -1,16 +1,16 @@
-import { BoCreateUserDto } from '@lib/shared/dto/bo/create-user.bo.dto';
+import { ClCreateUserDto } from '@lib/shared';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMinSize, IsArray, IsOptional, IsUUID } from 'class-validator';
+import { IsOptional, IsUUID } from 'class-validator';
 
-export class CreateUserDto extends BoCreateUserDto {
+export class CreateUserDto extends ClCreateUserDto {
   @IsOptional()
-  @IsArray()
-  @ArrayMinSize(1)
-  @IsUUID('4', { each: true })
+  @IsUUID('4')
   @ApiPropertyOptional({
-    description: 'Array of tenant IDs to assign the user to',
-    example: ['39182062-6c22-470e-b335-946b4db5f8dc'],
-    type: [String],
+    description: 'Tenant Group ID to assign to the user',
+    example: '39182062-6c22-470e-b335-946b4db5f8dc',
+    format: 'uuid',
   })
-  tenantIds?: string[];
+  tenantGroupId?: string;
+
+  // roleId
 }

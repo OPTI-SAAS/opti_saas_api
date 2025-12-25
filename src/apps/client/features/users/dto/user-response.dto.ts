@@ -1,7 +1,7 @@
-import { PaginationMetaDto, UserMeResponseDto } from '@lib/shared';
+import { ClUserMeResponseDto, PaginationMetaDto } from '@lib/shared';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class UserWithTenantsResponseDto extends UserMeResponseDto {}
+export class UserWithTenantsResponseDto extends ClUserMeResponseDto {}
 
 export class PaginatedUsersResponseDto {
   @ApiProperty({ type: () => [UserWithTenantsResponseDto] })

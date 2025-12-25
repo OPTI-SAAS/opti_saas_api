@@ -1,13 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 import { BaseResponseDto } from '../../base';
-import { TenantResponseDto } from './tenant-response.client.dto';
+import { ClTenantResponseDto } from './tenant-response.client.dto';
 
 /**
  * DTO representing the current authenticated user with their tenant memberships.
  * Used for the /auth/me endpoint response.
  */
-export class UserMeResponseDto extends BaseResponseDto {
+export class ClUserMeResponseDto extends BaseResponseDto {
   @ApiProperty({
     description: 'Email address of the user',
     example: 'user@tenant.com',
@@ -28,14 +28,8 @@ export class UserMeResponseDto extends BaseResponseDto {
   lastName!: string;
 
   @ApiProperty({
-    description: 'Indicates if the user is an owner',
-    example: false,
-  })
-  isOwner!: boolean;
-
-  @ApiProperty({
     description: 'List of tenants the user has access to',
-    type: () => [TenantResponseDto],
+    type: () => [ClTenantResponseDto],
   })
-  tenants!: TenantResponseDto[];
+  tenants!: ClTenantResponseDto[];
 }

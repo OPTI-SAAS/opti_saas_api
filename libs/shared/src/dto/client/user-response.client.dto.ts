@@ -3,7 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { BaseResponseDto } from '../../base';
 import { TUserStatus } from '../../enums/client';
 
-export class UserResponseDto extends BaseResponseDto {
+export class ClUserResponseDto extends BaseResponseDto {
   @ApiProperty({ example: 'John' })
   firstName!: string;
 
@@ -15,7 +15,4 @@ export class UserResponseDto extends BaseResponseDto {
 
   @ApiProperty({ example: 'active' })
   status!: TUserStatus;
-
-  @ApiProperty({ example: false })
-  isOwner?: boolean;
 }

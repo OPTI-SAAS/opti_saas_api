@@ -171,7 +171,6 @@ export class AuthService {
     const tenants = user.tenantMemberships.map((membership) => ({
       id: membership.tenant.id,
       name: membership.tenant.name,
-      dbSchema: membership.tenant.dbSchema,
     }));
 
     return {
@@ -179,7 +178,6 @@ export class AuthService {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      // isOwner: user.isOwner,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
       tenants,

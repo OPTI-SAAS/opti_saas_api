@@ -1,9 +1,8 @@
 import {
   ClientController,
+  ClUserMeResponseDto,
   CurrentUser,
   JwtAuthGuard,
-  RegularUserGuard,
-  UserMeResponseDto,
 } from '@lib/shared';
 import { Body, Get, Post, UseGuards } from '@nestjs/common';
 import {
@@ -35,10 +34,10 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard, RegularUserGuard)
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Get current authenticated user with tenants' })
-  @ApiOkResponse({ type: UserMeResponseDto })
+  @ApiOkResponse({ type: ClUserMeResponseDto })
   async getMe(@CurrentUser() user: { userId: string; email: string }) {
     return this.authService.getMe(user.userId);
   }

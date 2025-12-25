@@ -1,8 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
 import {
   IsAlphanumeric,
-  IsBoolean,
   IsEmail,
   IsNotEmpty,
   IsOptional,
@@ -13,7 +11,7 @@ import {
 
 import { CLIENT_USER_PASSWORD_REGEX } from '../../constants';
 
-export class CreateUserDto {
+export class ClCreateUserDto {
   @IsNotEmpty()
   @MaxLength(100)
   @IsAlphanumeric()
@@ -39,13 +37,4 @@ export class CreateUserDto {
     example: 'Hello12345',
   })
   password!: string;
-
-  @IsOptional()
-  @IsBoolean()
-  @Transform(
-    ({ value }) =>
-      value === 'true' || value === true || value === 1 || value === '1',
-  )
-  @ApiProperty({ example: false, default: false })
-  isOwner?: boolean = false;
 }
