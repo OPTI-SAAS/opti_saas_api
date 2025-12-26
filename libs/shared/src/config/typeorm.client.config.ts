@@ -1,6 +1,7 @@
+import * as path from 'node:path';
+
 import { ConfigService } from '@nestjs/config';
 import { config } from 'dotenv';
-import * as path from 'path';
 import { DataSource } from 'typeorm';
 import { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConnectionOptions';
 
