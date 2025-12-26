@@ -3,6 +3,7 @@ import {
   ClUserMeResponseDto,
   CurrentUser,
   JwtAuthGuard,
+  UserMeResponseDto,
 } from '@lib/shared';
 import { Body, Get, Post, UseGuards } from '@nestjs/common';
 import {
