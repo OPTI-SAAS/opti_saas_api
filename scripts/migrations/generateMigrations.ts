@@ -1,12 +1,12 @@
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
 import * as prettier from 'prettier';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { Query } from 'typeorm/driver/Query';
 import { camelCase } from 'typeorm/util/StringUtils';
 
-import { checkSchemaArgument } from './migration.helpers';
-import { getSourceSchema } from './migration.helpers';
+import { checkSchemaArgument, getSourceSchema } from './migration.helpers';
 import { SchemaType } from './migration.types';
 
 console.log('process.argv: ', process.argv);
@@ -16,7 +16,7 @@ if (process.argv.length < 3) {
   process.exit(1);
 }
 
-const migration_timestamp = new Date().getTime();
+const migration_timestamp = Date.now();
 
 const schema_type = checkSchemaArgument(process.argv[2]);
 
