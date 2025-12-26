@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
-import { TENANT_HEADER } from '../decorators/current-tenant.decorator';
+import { TENANT_HEADER } from '../constants';
 import { BoTenant, BoUser } from '../entities/backoffice';
 import { BACKOFFICE_CONNECTION } from '../modules/database';
 import { AuthenticatedRequest } from '../types';
