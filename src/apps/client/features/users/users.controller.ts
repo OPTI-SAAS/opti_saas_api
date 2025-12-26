@@ -7,6 +7,8 @@ import {
   JwtAuthGuard,
   OwnerGuard,
   PaginationQueryDto,
+  TENANT_HEADER,
+  TenantApiHeader,
 } from '@lib/shared';
 import { AuthenticatedUser } from '@lib/shared/types';
 import {
@@ -23,7 +25,6 @@ import {
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
-  ApiHeader,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -38,7 +39,7 @@ import {
 import { UsersService } from './users.service';
 
 const TENANT_HEADER_SCHEMA = {
-  name: 'x-tenant-id',
+  name: TENANT_HEADER,
   description:
     'Tenant ID to filter results by. Must be a UUID of a tenant the user has access to.',
   required: false,
@@ -65,7 +66,7 @@ export class UsersController {
   @Get()
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get all users with pagination' })
-  @ApiHeader(TENANT_HEADER_SCHEMA)
+  @TenantApiHeader()
   @ApiOkResponse({ type: PaginatedUsersResponseDto })
   async findAll(
     @Query() query: PaginationQueryDto,
@@ -78,7 +79,7 @@ export class UsersController {
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get a specific user by ID' })
-  @ApiHeader(TENANT_HEADER_SCHEMA)
+  @TenantApiHeader()
   @ApiOkResponse({ type: UserWithTenantsResponseDto })
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
@@ -91,7 +92,7 @@ export class UsersController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Update a user' })
-  @ApiHeader(TENANT_HEADER_SCHEMA)
+  @TenantApiHeader()
   @ApiOkResponse({ type: UserWithTenantsResponseDto })
   async update(
     @Param('id', ParseUUIDPipe) id: string,

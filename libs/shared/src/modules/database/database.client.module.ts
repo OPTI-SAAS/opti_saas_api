@@ -1,38 +1,37 @@
+import { TENANT_HEADER } from '@lib/shared/constants';
 import { Module, Scope, UnauthorizedException } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { REQUEST } from '@nestjs/core';
+import { isUUID } from 'class-validator';
 import { Request } from 'express';
 
-// import { JWTAuthModule, JWTAuthService } from '../jwt-auth';
-// import { getTenantConnection } from './connection.client';
+import { getTenantConnection } from './connection.client';
 import { CLIENT_CONNECTION } from './database.constant';
 
 const clientConnectionFactory = {
   scope: Scope.REQUEST,
   provide: CLIENT_CONNECTION,
-  useFactory: (
-    request: Request,
-    /* jwtAuthService: JWTAuthService, */
-    /* config: ConfigService, */
-  ) => {
+  useFactory: async (request: Request) => {
     try {
-      const authorization = request.headers.authorization;
-      if (authorization) {
-        // const token = authorization.split(' ')?.[1];
-        // const secret = config.getOrThrow<string>('jwt.client.secret');
-        // const payload = jwtAuthService.verifyToken({ token, secret: secret });
-        // return await getTenantConnection(payload.tenantId);
+      const tenantId = request.headers[TENANT_HEADER] as string | undefined;
+      if (!tenantId) {
+        throw new UnauthorizedException('Tenant ID is missing');
       }
+      if (!isUUID(tenantId)) {
+        throw new UnauthorizedException('Invalid Tenant ID format');
+      }
+      const tenantConnection = await getTenantConnection(tenantId);
+      return tenantConnection;
     } catch (error) {
       console.log('Error while getting tenant connection:', error);
     }
     throw new UnauthorizedException();
   },
-  inject: [REQUEST, /* JWTAuthService, */ ConfigService],
+  inject: [REQUEST, ConfigService],
 };
 
 @Module({
-  imports: [ConfigModule /* JWTAuthModule */],
+  imports: [ConfigModule],
   providers: [clientConnectionFactory],
   exports: [CLIENT_CONNECTION],
 })
