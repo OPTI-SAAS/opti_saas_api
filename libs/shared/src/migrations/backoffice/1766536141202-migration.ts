@@ -5,9 +5,6 @@ export class Migration1766536141202 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `CREATE TABLE "backoffice"."navigations" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP WITH TIME ZONE, "_type" character varying NOT NULL, "label" character varying, "icon" character varying, "route" character varying, "external_url" character varying, "parent_id" uuid, "authorizations_needed" character varying array NOT NULL, "is_all_authorizations_needed" boolean NOT NULL DEFAULT false, "disabled" boolean NOT NULL DEFAULT false, CONSTRAINT "PK_3f38689f82ca58a9ed44bc560ae" PRIMARY KEY ("id"))`,
-    );
-    await queryRunner.query(
       `CREATE TABLE "backoffice"."users" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP WITH TIME ZONE, "first_name" character varying(255) NOT NULL, "last_name" character varying(255) NOT NULL, "email" character varying(255) NOT NULL, "password" character varying(255) NOT NULL, "refresh_token" character varying(500), "tenant_group_id" uuid, CONSTRAINT "UQ_97672ac88f789774dd47f7c8be3" UNIQUE ("email"), CONSTRAINT "PK_a3ffb1c0c8416b9fc6f907b7433" PRIMARY KEY ("id"))`,
     );
     await queryRunner.query(
@@ -24,9 +21,6 @@ export class Migration1766536141202 implements MigrationInterface {
     );
     await queryRunner.query(
       `CREATE TABLE "backoffice"."roles" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "deleted_at" TIMESTAMP WITH TIME ZONE, "name" character varying NOT NULL, "authorizations" character varying array NOT NULL, CONSTRAINT "UQ_648e3f5447f725579d7d4ffdfb7" UNIQUE ("name"), CONSTRAINT "PK_c1433d71a4838793a49dcad46ab" PRIMARY KEY ("id"))`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "backoffice"."navigations" ADD CONSTRAINT "FK_ba17cb44ff7338551f953398158" FOREIGN KEY ("parent_id") REFERENCES "backoffice"."navigations"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
     );
     await queryRunner.query(
       `ALTER TABLE "backoffice"."users" ADD CONSTRAINT "FK_53403f80605ad6712266e23d603" FOREIGN KEY ("tenant_group_id") REFERENCES "backoffice"."tenant_groups"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`,
@@ -61,15 +55,11 @@ export class Migration1766536141202 implements MigrationInterface {
     await queryRunner.query(
       `ALTER TABLE "backoffice"."users" DROP CONSTRAINT "FK_53403f80605ad6712266e23d603"`,
     );
-    await queryRunner.query(
-      `ALTER TABLE "backoffice"."navigations" DROP CONSTRAINT "FK_ba17cb44ff7338551f953398158"`,
-    );
     await queryRunner.query(`DROP TABLE "backoffice"."roles"`);
     await queryRunner.query(`DROP TABLE "backoffice"."owners"`);
     await queryRunner.query(`DROP TABLE "backoffice"."tenant_groups"`);
     await queryRunner.query(`DROP TABLE "backoffice"."tenants"`);
     await queryRunner.query(`DROP TABLE "backoffice"."user_tenants"`);
     await queryRunner.query(`DROP TABLE "backoffice"."users"`);
-    await queryRunner.query(`DROP TABLE "backoffice"."navigations"`);
   }
 }

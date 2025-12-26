@@ -1,4 +1,3 @@
-export * from './navigations.bo.entity';
 export * from './owners.bo.entity';
 export * from './roles.bo.entity';
 export * from './tenant-groups.bo.entity';
