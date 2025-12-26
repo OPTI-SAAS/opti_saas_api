@@ -1,7 +1,13 @@
-import { getClientSourceOptions, sanitizeDatabaseSchema } from '@lib/shared';
+import {
+  BoTenant,
+  getClientSourceOptions,
+  sanitizeDatabaseSchema,
+} from '@lib/shared';
 import { ExceptionErrorType } from '@lib/shared/types';
 import { NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
+
+import { getBoConnection } from './connection.bo';
 
 const connections = new Map<string, DataSource>();
 
@@ -30,17 +36,25 @@ async function getExistingConnection(schema_name: string) {
 }
 
 export async function getTenantConnection(
-  schema_name: string,
+  tenantId: string,
   migrationsRun = false,
 ): Promise<DataSource> {
-  console.log(
-    `Getting connection for schema: ${schema_name} with migrationsRun: ${migrationsRun}`,
-  );
+  console.log(`Getting connection for tenantId: ${tenantId} `);
 
-  if (connections.has(schema_name)) {
-    return getExistingConnection(schema_name);
+  if (connections.has(tenantId)) {
+    return getExistingConnection(tenantId);
   }
-  console.log(`Creating new connection for schema: ${schema_name}`);
+  const boConnexion = await getBoConnection();
+  const tenantRepository = boConnexion.getRepository(BoTenant);
+  const tenant = await tenantRepository.findOneBy({ id: tenantId });
+  if (!tenant) {
+    throw new NotFoundException({
+      error_code: ExceptionErrorType.TenantNotFound,
+      message: `Tenant ID ${tenantId} not found`,
+    });
+  }
+  const schema_name = tenant.dbSchema;
+  console.log(`Creating new connection for tenantId: ${tenantId}`);
   const safeSchema = sanitizeDatabaseSchema(schema_name);
   try {
     // Create a new DataSource instance
@@ -66,7 +80,7 @@ export async function getTenantConnection(
 
     // If migrations are running so we don't add the connection to the map, since
     if (!migrationsRun) {
-      connections.set(safeSchema, newDataSource);
+      connections.set(tenantId, newDataSource);
     }
     return newDataSource;
   } catch (error) {

@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { Request } from 'express';
 
-export const TENANT_HEADER = 'x-tenant-id';
+import { TENANT_HEADER } from '../constants';
 
 export const CurrentTenant = createParamDecorator(
   (required: boolean = true, context: ExecutionContext): string | undefined => {
