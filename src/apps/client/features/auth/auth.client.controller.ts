@@ -4,7 +4,7 @@ import {
   JwtAuthGuard,
   TenantApiHeader,
 } from '@lib/shared';
-import { AuthenticatedUser } from '@lib/shared/types';
+import { JwtPayload } from '@lib/shared/types';
 import { Get, Injectable, Scope, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
@@ -21,8 +21,8 @@ export class AuthClientController {
   @Get('options')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get authenticated User options' })
-  async getAuthOptions(@CurrentUser() user: AuthenticatedUser) {
+  async getAuthOptions(@CurrentUser() user: JwtPayload) {
     console.log('user: ', user);
-    return await this.authClientService.getUserOptions(user.userId);
+    return await this.authClientService.getUserOptions(user.sub);
   }
 }

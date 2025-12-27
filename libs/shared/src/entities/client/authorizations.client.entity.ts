@@ -17,7 +17,7 @@ export class ClAuthorization extends BaseEntity {
   @JoinColumn({ name: 'role_id' })
   role!: ClRole;
 
-  @Column({ name: 'authorization', type: 'varchar', unique: true })
+  @Column({ name: 'authorization', type: 'varchar' })
   authorization!: ResourceAuthorizations;
 
   @Column({ name: 'coefficient', type: 'smallint', nullable: false })

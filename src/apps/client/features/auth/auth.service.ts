@@ -45,7 +45,6 @@ export class AuthService {
     const payload = {
       sub: user.id,
       email: user.email,
-      // isOwner: user.isOwner
     };
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload),
@@ -159,6 +158,9 @@ export class AuthService {
   }
 
   async getMe(userId: string) {
+    if (!userId) {
+      throw new UnauthorizedException('User ID is required');
+    }
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ['tenantMemberships', 'tenantMemberships.tenant'],
