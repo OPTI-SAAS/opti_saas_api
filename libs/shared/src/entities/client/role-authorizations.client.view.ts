@@ -9,76 +9,77 @@ import { PostgresConnectionOptions } from 'typeorm/driver/postgres/PostgresConne
 
     return connection
       .createQueryBuilder()
+      .from(`${schema}.roles`, 'ro')
       .select('ro.id', 'role_id')
       .addSelect('ro.name', 'role_name')
       .addSelect('ro.parent_id', 'parent_id')
       .addSelect('ro.created_at', 'created_at')
       .addSelect('ro.updated_at', 'updated_at')
-      .addSelect((subQuery) => {
-        return subQuery
-          .select(
-            `COALESCE(
-              ARRAY(
-                SELECT DISTINCT unnested_auth
-                FROM (
-                  SELECT UNNEST(COALESCE(br.authorizations, ARRAY[]::varchar[])) AS unnested_auth
-                  FROM backoffice.roles br
-                  WHERE br.id = a.parent_id
-                  
-                  UNION
-                  
-                  SELECT ra.authorization
-                  FROM "${schema}".role_authorization ra
-                  WHERE ra.role_id = a.id 
-                    AND ra.deleted_at IS NULL
-                    AND ra.coefficient = 0
-
-                  EXCEPT
-                  SELECT ra.authorization
-                  FROM "${schema}".role_authorization ra
-                  WHERE ra.role_id = a.id 
-                    AND ra.deleted_at IS NULL
-                    AND ra.coefficient = -1
-                ) combined_auths
-              ),
-              ARRAY[]::varchar[]
-            )`,
-          )
-          .from(`${schema}.roles`, 'a');
-      }, 'authorizations')
-      .addSelect((subQuery) => {
-        return subQuery
-          .select(
-            `COALESCE(
+      .addSelect(
+        `
+            COALESCE(
               ARRAY(
                 SELECT ra.authorization
                 FROM "${schema}".role_authorization ra
-                WHERE ra.role_id = aa.id 
+                WHERE ra.role_id = ro.id
                   AND ra.deleted_at IS NULL
                   AND ra.coefficient = 0
               ),
               ARRAY[]::varchar[]
-            )`,
-          )
-          .from(`${schema}.roles`, 'aa');
-      }, 'added_authorizations')
-      .addSelect((subQuery) => {
-        return subQuery
-          .select(
-            `COALESCE(
-              ARRAY(
-                SELECT ra.authorization
-                FROM "${schema}".role_authorization ra
-                WHERE ra.role_id = rva.id 
-                  AND ra.deleted_at IS NULL
-                  AND ra.coefficient = -1
-              ),
-              ARRAY[]::varchar[]
-            )`,
-          )
-          .from(`${schema}.roles`, 'rva');
-      }, 'removed_authorizations')
-      .from(`${schema}.roles`, 'ro')
+            )
+            `,
+        'added_authorizations',
+      )
+      .addSelect(
+        `
+              COALESCE(
+                ARRAY(
+                  SELECT ra.authorization
+                  FROM "${schema}".role_authorization ra
+                  WHERE ra.role_id = ro.id
+                    AND ra.deleted_at IS NULL
+                    AND ra.coefficient = -1
+                ),
+                ARRAY[]::varchar[]
+              )
+              `,
+        'removed_authorizations',
+      )
+      .addSelect(
+        `
+      COALESCE(
+        ARRAY(
+          SELECT DISTINCT auth
+          FROM (
+            -- parent auths from backoffice role
+            SELECT unnest(COALESCE(br.authorizations, ARRAY[]::varchar[])) AS auth
+            FROM backoffice.roles br
+            WHERE br.id = ro.parent_id
+
+            UNION
+
+            -- added
+            SELECT ra.authorization AS auth
+            FROM "${schema}".role_authorization ra
+            WHERE ra.role_id = ro.id
+              AND ra.deleted_at IS NULL
+              AND ra.coefficient = 0
+
+            EXCEPT
+
+            -- removed
+            SELECT ra.authorization AS auth
+            FROM "${schema}".role_authorization ra
+            WHERE ra.role_id = ro.id
+              AND ra.deleted_at IS NULL
+              AND ra.coefficient = -1
+          ) x
+        ),
+        ARRAY[]::varchar[]
+      )
+      `,
+        'authorizations',
+      )
       .where('ro.deleted_at IS NULL');
   },
 })
