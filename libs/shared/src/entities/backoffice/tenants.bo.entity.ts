@@ -1,10 +1,12 @@
 import { BaseEntity } from '@lib/shared/base';
+import { Exclude, Expose } from 'class-transformer';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 import { BoTenantGroup } from './tenant-groups.bo.entity';
 import { BoUserTenant } from './user-tenants.bo.entity';
 
 @Entity('tenants', { schema: 'backoffice' })
+@Exclude()
 export class BoTenant extends BaseEntity {
   @Column({ name: 'tenant_group_id', type: 'uuid' })
   tenantGroupId!: string;
@@ -22,5 +24,6 @@ export class BoTenant extends BaseEntity {
   dbSchema!: string;
 
   @Column({ name: 'name', type: 'varchar', unique: true })
+  @Expose()
   name!: string;
 }

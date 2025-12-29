@@ -1,16 +1,17 @@
 import { ClCreateUserDto } from '@lib/shared';
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsUUID } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { ArrayNotEmpty, IsArray, IsUUID } from 'class-validator';
 
 export class CreateUserDto extends ClCreateUserDto {
-  @IsOptional()
-  @IsUUID('4')
-  @ApiPropertyOptional({
-    description: 'Tenant Group ID to assign to the user',
-    example: '39182062-6c22-470e-b335-946b4db5f8dc',
-    format: 'uuid',
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsUUID('4', { each: true })
+  @ApiProperty({
+    description: 'Array of Tenant IDs to assign the user to',
+    example: ['9c5802c1-03f4-45ff-8ab6-094ed391ac95'],
+    type: [String],
   })
-  tenantGroupId?: string;
+  tenantIds!: string[];
 
   // roleId
 }

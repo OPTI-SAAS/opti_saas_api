@@ -7,6 +7,7 @@ import {
 import { AuthenticatedUser } from '@lib/shared/types';
 import {
   Body,
+  ClassSerializerInterceptor,
   Delete,
   Get,
   Param,
@@ -15,6 +16,7 @@ import {
   Post,
   Query,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -36,14 +38,18 @@ import { UsersService } from './users.service';
 @ClientController('users')
 @ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard)
+@UseInterceptors(ClassSerializerInterceptor)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new user in the tenant' })
   @ApiCreatedResponse({ type: UserWithTenantsResponseDto })
-  async create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
+  async create(
+    @Body() createUserDto: CreateUserDto,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ) {
+    return this.usersService.create(createUserDto, currentUser.userId);
   }
 
   @Get()

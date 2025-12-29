@@ -20,7 +20,12 @@ export class JwtAuthGuard implements CanActivate {
       const payload = await this.jwtService.verifyAsync<JwtPayload>(token);
       // 💡 We're assigning the payload to the request object here
       // so that we can access it in our route handlers
-      request.user = payload;
+      // Transform payload to match AuthenticatedUser interface
+      request.user = {
+        userId: payload.sub,
+        email: payload.email,
+        isOwner: payload.isOwner,
+      };
     } catch (error) {
       throw new UnauthorizedException(error);
     }

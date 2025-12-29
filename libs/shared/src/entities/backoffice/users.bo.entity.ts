@@ -1,5 +1,5 @@
 import { bycryptHashPassword, comparePassword } from '@lib/shared/helpers';
-import { Exclude } from 'class-transformer';
+import { Exclude, Expose, Transform } from 'class-transformer';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 import { BaseEntity } from '../../base';
@@ -7,12 +7,14 @@ import { BoTenantGroup } from './tenant-groups.bo.entity';
 import { BoUserTenant } from './user-tenants.bo.entity';
 
 @Entity('users', { schema: 'backoffice' })
+@Exclude()
 export class BoUser extends BaseEntity {
   @Column({
     type: 'varchar',
     name: 'first_name',
     length: 255,
   })
+  @Expose()
   firstName!: string;
 
   @Column({
@@ -20,9 +22,11 @@ export class BoUser extends BaseEntity {
     name: 'last_name',
     length: 255,
   })
+  @Expose()
   lastName!: string;
 
   @Column({ unique: true, type: 'varchar', length: 255 })
+  @Expose()
   email!: string;
 
   @Column({
@@ -44,6 +48,14 @@ export class BoUser extends BaseEntity {
 
   // memberships to specific tenants inside his group
   @OneToMany(() => BoUserTenant, (ut) => ut.user)
+  @Expose({ name: 'tenants' })
+  @Transform(
+    ({ value }) =>
+      value?.map((m: BoUserTenant) => ({
+        id: m.tenant?.id,
+        name: m.tenant?.name,
+      })) || [],
+  )
   tenantMemberships!: BoUserTenant[];
 
   @Column({

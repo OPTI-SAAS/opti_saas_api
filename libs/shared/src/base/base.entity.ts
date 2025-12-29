@@ -1,3 +1,4 @@
+import { Expose } from 'class-transformer';
 import {
   CreateDateColumn,
   DeleteDateColumn,
@@ -7,6 +8,7 @@ import {
 
 export abstract class BaseEntity {
   @PrimaryGeneratedColumn('uuid')
+  @Expose()
   id!: string;
 
   @CreateDateColumn({
@@ -15,6 +17,7 @@ export abstract class BaseEntity {
     default: () => 'CURRENT_TIMESTAMP',
     nullable: false,
   })
+  @Expose()
   createdAt!: Date;
 
   @UpdateDateColumn({
@@ -24,6 +27,7 @@ export abstract class BaseEntity {
     onUpdate: 'CURRENT_TIMESTAMP',
     nullable: false,
   })
+  @Expose()
   updatedAt!: Date;
 
   @DeleteDateColumn({
@@ -32,5 +36,6 @@ export abstract class BaseEntity {
     nullable: true,
     default: null,
   })
+  @Expose()
   deletedAt!: Date;
 }

@@ -1,6 +1,13 @@
 import { BoCreateUserDto } from '@lib/shared/dto/bo/create-user.bo.dto';
 import { ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, ValidateIf } from 'class-validator';
+import {
+  IsArray,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateIf,
+} from 'class-validator';
 
 export class UpdateUserDto extends PartialType(
   OmitType(BoCreateUserDto, ['email']),
@@ -19,4 +26,15 @@ export class UpdateUserDto extends PartialType(
     example: 'OldPassword123',
   })
   currentPassword?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  @ApiPropertyOptional({
+    description:
+      'Array of Tenant IDs to assign the user to (replaces existing assignments)',
+    example: ['9c5802c1-03f4-45ff-8ab6-094ed391ac95'],
+    type: [String],
+  })
+  tenantIds?: string[];
 }
