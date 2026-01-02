@@ -13,6 +13,7 @@ export const ExceptionErrorType = {
   TenantIsRequired: 'TENANT_ID_REQUIRED',
   TenantIsInvalid: 'TENANT_ID_INVALID',
   TenantNotFound: 'TENANT_ID_NOT_FOUND',
+  TenantMigrationFailed: 'TENANT_MIGRATION_FAILED',
   // ** users
   UserExists: 'USER_EXISTS',
   BlockedUser: 'BLOCKED_USER',
