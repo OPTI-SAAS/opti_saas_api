@@ -31,8 +31,10 @@ export class MyClientService {
   constructor(private readonly tenantRepoFactory: TenantRepositoryFactory) {}
 
   async findSomething() {
-    const repo = await this.tenantRepoFactory.repo(MyEntity);
-    return repo.find();
+    return this.tenantRepoFactory.executeInContext(async (manager) => {
+      const repo = manager.getRepository(MyEntity);
+      return repo.find();
+    });
   }
 }
 ```
@@ -53,36 +55,37 @@ Wraps AsyncLocalStorage to manage tenant context throughout the request lifecycl
 
 Extracts `tenantId` from request headers and establishes context.
 
-**Supported Headers:**
+**Supported Header:**
 
-- `tenantid`
-- `tenant-id`
 - `x-tenant-id`
 
 **Validation:**
 
 - Must match regex: `/^[a-zA-Z0-9_-]{1,64}$/`
-- Throws `BadRequestException` if missing or invalid
+- If missing, logs error and continues (doesn't throw exception)
+- Throws `BadRequestException` if format is invalid
 
 ### 3. TenantDataSourceManager
 
-Manages per-tenant DataSource instances with lazy initialization and caching.
+Manages a single shared DataSource and sets tenant schema at the transaction level.
 
 **Features:**
 
-- Thread-safe connection pooling using `Map<string, Promise<DataSource>>`
-- Automatic schema validation and initialization
-- Connection reuse across requests
-- Increased pool size (10 connections per tenant)
+- Single shared DataSource for all tenants
+- Schema set via `SET search_path` per connection
+- Automatic schema validation on each request
+- Connection pooling handled by TypeORM
 
 ### 4. TenantRepositoryFactory
 
-Provides repositories from the current tenant's DataSource.
+Provides callback-based methods to execute code within tenant context.
 
 **Methods:**
 
-- `getRepository<Entity>(Entity)` - Get repository for entity
-- `repo<Entity>(Entity)` - Shorthand alias
+- `executeInContext(callback)` - Execute callback with tenant schema set (for read operations)
+- `executeInTransaction(callback)` - Execute callback within a transaction with tenant schema set (for write operations)
+
+Both methods receive an `EntityManager` in the callback where you can call `manager.getRepository(Entity)` to access repositories.
 
 ## Migration Steps
 
@@ -131,7 +134,7 @@ export class MyController {
 
 ### Step 3: Update Repository Access
 
-Replace constructor-injected repositories with factory calls inside methods.
+Replace constructor-injected repositories with context-based callbacks.
 
 **Before:**
 
@@ -158,8 +161,10 @@ export class UserService {
   constructor(private readonly tenantRepoFactory: TenantRepositoryFactory) {}
 
   async findUser(id: string) {
-    const userRepo = await this.tenantRepoFactory.repo(ClUser);
-    return userRepo.findOne({ where: { id } });
+    return this.tenantRepoFactory.executeInContext(async (manager) => {
+      const userRepo = manager.getRepository(ClUser);
+      return userRepo.findOne({ where: { id } });
+    });
   }
 }
 ```
@@ -206,21 +211,36 @@ export class MyService {
 }
 ```
 
-### Manual DataSource Access
+### Using Transactions for Write Operations
 
 ```typescript
 @Injectable()
 export class MyService {
-  constructor(private readonly dataSourceManager: TenantDataSourceManager) {}
+  constructor(private readonly tenantRepoFactory: TenantRepositoryFactory) {}
 
-  async runRawQuery() {
-    const dataSource = await this.dataSourceManager.getDataSource();
-    return dataSource.query('SELECT * FROM custom_table');
+  async updateUserData(userId: string, data: any) {
+    return this.tenantRepoFactory.executeInTransaction(async (manager) => {
+      // All operations here run within a transaction
+      // If any operation fails, everything will be rolled back
+      const userRepo = manager.getRepository(ClUser);
+      const user = await userRepo.findOne({ where: { id: userId } });
+
+      user.name = data.name;
+      await userRepo.save(user);
+
+      // Can run raw queries too
+      await manager.query(
+        'UPDATE audit_log SET updated = true WHERE user_id = $1',
+        [userId],
+      );
+
+      return user;
+    });
   }
 }
 ```
 
-### Working with Multiple Repositories
+### Working with Multiple Repositories in a Transaction
 
 ```typescript
 @Injectable()
@@ -228,28 +248,39 @@ export class OrderService {
   constructor(private readonly tenantRepoFactory: TenantRepositoryFactory) {}
 
   async createOrder(data: CreateOrderDto) {
-    // Get multiple repositories
-    const orderRepo = await this.tenantRepoFactory.repo(ClOrder);
-    const productRepo = await this.tenantRepoFactory.repo(ClProduct);
-    const inventoryRepo = await this.tenantRepoFactory.repo(ClInventory);
+    return this.tenantRepoFactory.executeInTransaction(async (manager) => {
+      // All repositories share the same transaction
+      const orderRepo = manager.getRepository(ClOrder);
+      const productRepo = manager.getRepository(ClProduct);
+      const inventoryRepo = manager.getRepository(ClInventory);
 
-    // Use them in transaction
-    const order = await orderRepo.save({ ...data });
-    await productRepo.update(data.productId, { stock: () => 'stock - 1' });
-    await inventoryRepo.insert({ orderId: order.id, ... });
+      // Create order
+      const order = await orderRepo.save({ ...data });
 
-    return order;
+      // Update product stock
+      await productRepo.decrement({ id: data.productId }, 'stock', 1);
+
+      // Record inventory change
+      await inventoryRepo.insert({
+        orderId: order.id,
+        productId: data.productId,
+      });
+
+      // If any operation fails, all changes are rolled back automatically
+      return order;
+    });
   }
 }
 ```
 
 ## Benefits
 
-✅ **Performance:** Singleton providers are instantiated once, not per-request
-✅ **Memory:** Reduced memory footprint (no duplicate service instances)
-✅ **Connection Pooling:** Better database connection reuse
-✅ **Cleaner Code:** No more `{ scope: Scope.REQUEST }` boilerplate
-✅ **Type Safety:** Full TypeScript support with proper generics
+✅ **Performance:** Singleton providers are instantiated once, not per-request  
+✅ **Memory:** Reduced memory footprint (no duplicate service instances)  
+✅ **Single DataSource:** One shared connection pool for all tenants  
+✅ **Transaction Safety:** Automatic rollback on errors with `executeInTransaction`  
+✅ **Cleaner Code:** No more `{ scope: Scope.REQUEST }` boilerplate  
+✅ **Type Safety:** Full TypeScript support with proper generics  
 ✅ **Testability:** Easier to mock and test singleton services
 
 ## Testing
@@ -263,8 +294,8 @@ describe('MyService', () => {
 
   beforeEach(async () => {
     mockRepoFactory = {
-      repo: jest.fn(),
-      getRepository: jest.fn(),
+      executeInContext: jest.fn(),
+      executeInTransaction: jest.fn(),
     } as any;
 
     const module = await Test.createTestingModule({
@@ -281,11 +312,17 @@ describe('MyService', () => {
     const mockRepo = {
       findOne: jest.fn().mockResolvedValue({ id: '1', name: 'Test' }),
     };
-    mockRepoFactory.repo.mockResolvedValue(mockRepo as any);
+    const mockManager = {
+      getRepository: jest.fn().mockReturnValue(mockRepo),
+    };
+
+    mockRepoFactory.executeInContext.mockImplementation(async (callback) => {
+      return callback(mockManager as any);
+    });
 
     const result = await service.findUser('1');
 
-    expect(mockRepoFactory.repo).toHaveBeenCalledWith(ClUser);
+    expect(mockManager.getRepository).toHaveBeenCalledWith(ClUser);
     expect(result).toEqual({ id: '1', name: 'Test' });
   });
 });
@@ -323,7 +360,7 @@ it('/GET client/users (without tenant)', () => {
 
 **Cause:** Missing tenant header in the request.
 
-**Solution:** Include one of the supported headers: `x-tenant-id`, `tenant-id`, or `tenantid`.
+**Solution:** Include the `x-tenant-id` header in your request.
 
 ### Error: "Invalid Tenant ID format"
 
@@ -337,7 +374,8 @@ All new client-side services and controllers should:
 
 1. ✅ Use default singleton scope (no `{ scope: Scope.REQUEST }`)
 2. ✅ Inject `TenantRepositoryFactory` instead of `CLIENT_CONNECTION`
-3. ✅ Call `repo(Entity)` inside methods, not in constructor
-4. ✅ Remove any manual tenantId parameter passing
+3. ✅ Use `executeInContext()` for read operations or `executeInTransaction()` for write operations
+4. ✅ Call `manager.getRepository(Entity)` inside the callback to access repositories
+5. ✅ Remove any manual tenantId parameter passing
 
 The backoffice module remains unchanged and continues using singleton providers as before.
