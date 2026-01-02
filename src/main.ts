@@ -4,9 +4,13 @@ import {
   TENANT_HEADER,
   TransformInterceptor,
 } from '@lib/shared';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import {
+  ClassSerializerInterceptor,
+  Logger,
+  ValidationPipe,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { json, urlencoded } from 'body-parser';
 
@@ -43,7 +47,8 @@ async function bootstrap() {
         whitelist: true,
         forbidNonWhitelisted: true,
       }),
-    );
+    )
+    .useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
   app.use(json({ limit: '50mb' }));
   app.use(urlencoded({ extended: true, limit: '50mb' }));
