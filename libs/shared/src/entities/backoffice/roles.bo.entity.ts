@@ -7,6 +7,9 @@ export class BoRole extends BaseEntity {
   @Column({ name: 'name', type: 'varchar', unique: true })
   name!: string;
 
+  @Column({ name: 'is_admin', type: 'boolean', default: false })
+  isAdmin!: boolean;
+
   @Column('varchar', { name: 'authorizations', array: true, nullable: false })
   authorizations!: ResourceAuthorizations[];
 }
