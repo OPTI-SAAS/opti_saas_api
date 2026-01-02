@@ -66,3 +66,27 @@ export function handleDbError(error: any): never {
 
   throw error;
 }
+
+export function generateTenantSchemaName(tenantName: string): string {
+  let base = tenantName
+    .trim()
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  base = base
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/_{2,}/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  if (!/^[a-z_]/.test(base)) {
+    base = `tenant_${base}`;
+  }
+
+  const ts = Date.now().toString();
+  const suffix = `_${ts}`;
+
+  base = base.substring(0, 63 - suffix.length);
+
+  return `${base}${suffix}`;
+}

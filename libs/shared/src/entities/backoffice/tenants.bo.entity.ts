@@ -1,5 +1,14 @@
 import { BaseEntity } from '@lib/shared/base';
-import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
+import { generateTenantSchemaName } from '@lib/shared/helpers';
+import { Exclude } from 'class-transformer';
+import {
+  BeforeInsert,
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+} from 'typeorm';
 
 import { BoTenantGroup } from './tenant-groups.bo.entity';
 import { BoUserTenant } from './user-tenants.bo.entity';
@@ -18,9 +27,17 @@ export class BoTenant extends BaseEntity {
   @OneToMany(() => BoUserTenant, (ut) => ut.tenant)
   userMemberships!: BoUserTenant[];
 
-  @Column({ name: 'db_schema', type: 'varchar', unique: true, nullable: true })
+  @Column({ name: 'db_schema', type: 'varchar', unique: true, nullable: false })
+  @Exclude()
   dbSchema!: string;
 
   @Column({ name: 'name', type: 'varchar', unique: true })
   name!: string;
+
+  @BeforeInsert()
+  setDbSchemaOnInsert() {
+    if (!this.dbSchema) {
+      this.dbSchema = generateTenantSchemaName(this.name);
+    }
+  }
 }
