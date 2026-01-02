@@ -21,7 +21,6 @@ export class AuthClientController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get authenticated User options' })
   async getAuthOptions(@CurrentUser() user: JwtPayload) {
-    console.log('user: ', user);
     return await this.authClientService.getUserOptions(user.sub);
   }
 }
