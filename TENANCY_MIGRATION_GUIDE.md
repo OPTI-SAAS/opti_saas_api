@@ -31,7 +31,7 @@ export class MyClientService {
   constructor(private readonly tenantRepoFactory: TenantRepositoryFactory) {}
 
   async findSomething() {
-    return this.tenantRepoFactory.executeInContext(async (manager) => {
+    return this.tenantRepoFactory.executeInTransaction(async (manager) => {
       const repo = manager.getRepository(MyEntity);
       return repo.find();
     });
@@ -78,14 +78,13 @@ Manages a single shared DataSource and sets tenant schema at the transaction lev
 
 ### 4. TenantRepositoryFactory
 
-Provides callback-based methods to execute code within tenant context.
+Provides a transaction-based method to execute code within tenant context.
 
-**Methods:**
+**Method:**
 
-- `executeInContext(callback)` - Execute callback with tenant schema set (for read operations)
-- `executeInTransaction(callback)` - Execute callback within a transaction with tenant schema set (for write operations)
+- `executeInTransaction(callback)` - Execute callback within a transaction with tenant schema set
 
-Both methods receive an `EntityManager` in the callback where you can call `manager.getRepository(Entity)` to access repositories.
+The method receives an `EntityManager` in the callback where you can call `manager.getRepository(Entity)` to access repositories. All operations within the callback are automatically wrapped in a transaction with automatic rollback on error.
 
 ## Migration Steps
 
@@ -161,7 +160,7 @@ export class UserService {
   constructor(private readonly tenantRepoFactory: TenantRepositoryFactory) {}
 
   async findUser(id: string) {
-    return this.tenantRepoFactory.executeInContext(async (manager) => {
+    return this.tenantRepoFactory.executeInTransaction(async (manager) => {
       const userRepo = manager.getRepository(ClUser);
       return userRepo.findOne({ where: { id } });
     });
@@ -211,7 +210,7 @@ export class MyService {
 }
 ```
 
-### Using Transactions for Write Operations
+### Basic Transaction Example
 
 ```typescript
 @Injectable()
@@ -294,7 +293,6 @@ describe('MyService', () => {
 
   beforeEach(async () => {
     mockRepoFactory = {
-      executeInContext: jest.fn(),
       executeInTransaction: jest.fn(),
     } as any;
 
@@ -316,9 +314,11 @@ describe('MyService', () => {
       getRepository: jest.fn().mockReturnValue(mockRepo),
     };
 
-    mockRepoFactory.executeInContext.mockImplementation(async (callback) => {
-      return callback(mockManager as any);
-    });
+    mockRepoFactory.executeInTransaction.mockImplementation(
+      async (callback) => {
+        return callback(mockManager as any);
+      },
+    );
 
     const result = await service.findUser('1');
 
@@ -374,7 +374,7 @@ All new client-side services and controllers should:
 
 1. ✅ Use default singleton scope (no `{ scope: Scope.REQUEST }`)
 2. ✅ Inject `TenantRepositoryFactory` instead of `CLIENT_CONNECTION`
-3. ✅ Use `executeInContext()` for read operations or `executeInTransaction()` for write operations
+3. ✅ Use `executeInTransaction()` for all database operations
 4. ✅ Call `manager.getRepository(Entity)` inside the callback to access repositories
 5. ✅ Remove any manual tenantId parameter passing
 

@@ -59,46 +59,6 @@ export class TenantDataSourceManager implements OnModuleInit {
   }
 
   /**
-   * Execute a callback within a tenant context with schema set
-   * @param callback Function that receives EntityManager with tenant schema set
-   * @param tenantId Optional tenant ID (uses context if not provided)
-   */
-  async executeInTenantContext<T>(
-    callback: (manager: EntityManager) => Promise<T>,
-    tenantId?: string,
-  ): Promise<T> {
-    await this.initPromise;
-
-    const resolvedTenantId = tenantId ?? this.tenantContext.getTenantId();
-    const schema = await this.getTenantSchema(resolvedTenantId);
-
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-
-    try {
-      // Set search path for this connection
-      await queryRunner.query(`SET search_path TO "${schema}", public;`);
-
-      // Verify schema is set correctly
-      const schemaResult = (await queryRunner.query(
-        'SELECT current_schema() as schema',
-      )) as Array<{ schema: string }>;
-
-      if (schemaResult[0].schema !== schema) {
-        throw new NotFoundException({
-          error_code: ExceptionErrorType.TenantNotFound,
-          message: `[DB not initialized] Tenant schema ${schema} not found`,
-        });
-      }
-
-      // Execute the callback with the manager
-      return await callback(queryRunner.manager);
-    } finally {
-      await queryRunner.release();
-    }
-  }
-
-  /**
    * Execute a transactional callback within tenant context
    * @param callback Function that receives EntityManager within a transaction
    * @param tenantId Optional tenant ID (uses context if not provided)
@@ -118,14 +78,14 @@ export class TenantDataSourceManager implements OnModuleInit {
 
     try {
       // Set search path for this transaction
-      await queryRunner.query(`SET search_path TO "${schema}", public;`);
+      await queryRunner.query(`SET LOCAL search_path TO "${schema}", public;`);
 
       // Verify schema is set correctly
-      const schemaResult = (await queryRunner.query(
-        'SELECT current_schema() as schema',
-      )) as Array<{ schema: string }>;
-
-      if (schemaResult[0].schema !== schema) {
+      const [{ search_path }] = await queryRunner.query(`SHOW search_path`);
+      if (
+        !String(search_path).includes(`"${schema}"`) &&
+        !String(search_path).includes(schema)
+      ) {
         throw new NotFoundException({
           error_code: ExceptionErrorType.TenantNotFound,
           message: `[DB not initialized] Tenant schema ${schema} not found`,

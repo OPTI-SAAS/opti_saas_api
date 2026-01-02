@@ -13,7 +13,7 @@ export class AuthClientService {
   @logcall()
   async getUserOptions(userId: string) {
     // Execute within tenant context - schema is automatically set
-    const authorizations = await this.tenantRepoFactory.executeInContext(
+    const authorizations = await this.tenantRepoFactory.executeInTransaction(
       async (manager) => {
         const clUserRoleRepository = manager.getRepository(ClUserRole);
         const clRoleAuthorizationsViewRepository = manager.getRepository(
