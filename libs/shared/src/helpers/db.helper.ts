@@ -1,4 +1,3 @@
-/* eslint-disable unicorn/prevent-abbreviations */
 import { DBErrorCode } from '@lib/shared/types';
 import {
   BadRequestException,

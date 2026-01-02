@@ -1,11 +1,7 @@
-import {
-  BoTenant,
-  getClientSourceOptions,
-  sanitizeDatabaseSchema,
-} from '@lib/shared';
+import { BoTenant, getClientSourceOptions } from '@lib/shared';
 import { ExceptionErrorType } from '@lib/shared/types';
 import { NotFoundException } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource } from 'typeorm';
 
 import { getBoConnection } from './connection.bo';
 
@@ -93,14 +89,4 @@ export async function getTenantConnection(
       message: `[Error while migrating] Tenant ID ${safeSchema}`,
     });
   }
-}
-
-export async function getTenantEntityManager(
-  schema: string,
-): Promise<EntityManager> {
-  const safeSchema = sanitizeDatabaseSchema(schema);
-  const dataSource = await getTenantConnection(safeSchema);
-  const queryRunner = dataSource.createQueryRunner();
-  await queryRunner.connect();
-  return queryRunner.manager;
 }

@@ -40,8 +40,6 @@ export class AuthController {
   @ApiOperation({ summary: 'Get current authenticated user with tenants' })
   @ApiOkResponse({ type: UserMeResponseDto })
   async getMe(@CurrentUser() user: JwtPayload) {
-    console.log('user: ', user);
-
     return this.authService.getMe(user.sub);
   }
 }

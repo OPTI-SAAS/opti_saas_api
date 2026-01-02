@@ -105,9 +105,7 @@ export class TenantsService {
   }
 
   async setupTenantRoles(manager: EntityManager) {
-    console.log('manager: ', manager);
     const boRoleRepository = manager.getRepository(BoRole);
-    console.log('boRoleRepository: ', boRoleRepository);
 
     const adminRole = await boRoleRepository.findOne({
       where: { isAdmin: true },
@@ -116,7 +114,6 @@ export class TenantsService {
       throw new Error('Admin role not found in backoffice roles setup');
     }
     const clRoleRepository = manager.getRepository(ClRole);
-    console.log('clRoleRepository: ', clRoleRepository);
 
     // copy backoffice roles to client roles
     const boRoles = await boRoleRepository.find();

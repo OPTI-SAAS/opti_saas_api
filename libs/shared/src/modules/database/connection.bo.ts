@@ -10,10 +10,8 @@ const BO_SCHEMA = 'backoffice';
 export async function getBoConnection(): Promise<DataSource> {
   const schema_name = BO_SCHEMA;
   if (bo_connection) {
-    console.log(`Connection for schema: ${schema_name} already exists`);
     const existingConnection = bo_connection;
     if (existingConnection?.isInitialized) {
-      console.log(`Connection for schema: ${schema_name} is initialized`);
       return existingConnection;
     }
     try {
