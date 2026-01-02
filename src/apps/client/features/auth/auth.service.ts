@@ -12,7 +12,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 
 @Injectable()
 export class AuthService {
-  private userRepository: Repository<BoUser>;
+  private readonly userRepository: Repository<BoUser>;
 
   constructor(
     @Inject(BACKOFFICE_CONNECTION)

@@ -5,7 +5,7 @@ import {
   TenantApiHeader,
 } from '@lib/shared';
 import { JwtPayload } from '@lib/shared/types';
-import { Get, Injectable, Scope, UseGuards } from '@nestjs/common';
+import { Get, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { AuthClientService } from './auth.client.service';
@@ -14,7 +14,6 @@ import { AuthClientService } from './auth.client.service';
 @ClientController('auth')
 @ApiBearerAuth('access-token')
 @TenantApiHeader()
-@Injectable({ scope: Scope.REQUEST })
 export class AuthClientController {
   constructor(private readonly authClientService: AuthClientService) {}
 
