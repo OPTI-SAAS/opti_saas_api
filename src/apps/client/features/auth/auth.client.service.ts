@@ -1,42 +1,44 @@
 import {
-  CLIENT_CONNECTION,
   ClRoleAuthorizationsView,
   ClUserRole,
   logcall,
+  TenantRepositoryFactory,
 } from '@lib/shared';
-import { Inject, Injectable, Scope } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { Injectable } from '@nestjs/common';
 
-@Injectable({ scope: Scope.REQUEST })
+@Injectable()
 export class AuthClientService {
-  private readonly clRoleAuthorizationsViewRepository: Repository<ClRoleAuthorizationsView>;
-  private readonly clUserRoleRepository: Repository<ClUserRole>;
-
-  constructor(@Inject(CLIENT_CONNECTION) connection: DataSource) {
-    this.clRoleAuthorizationsViewRepository = connection.getRepository(
-      ClRoleAuthorizationsView,
-    );
-    this.clUserRoleRepository = connection.getRepository(ClUserRole);
-  }
+  constructor(private readonly tenantRepoFactory: TenantRepositoryFactory) {}
 
   @logcall()
   async getUserOptions(userId: string) {
-    const user = await this.clUserRoleRepository.findOne({
-      where: { userId },
-      select: ['roleId'],
-    });
-    if (!user) {
-      throw new Error('User not found in tenant');
-    }
-    const roleAuthorizations =
-      await this.clRoleAuthorizationsViewRepository.findOne({
-        where: { roleId: user.roleId },
-      });
-    if (!roleAuthorizations) {
-      throw new Error('Role authorizations not found');
-    }
-    return {
-      authorizations: roleAuthorizations.authorizations,
-    };
+    // Execute within tenant context - schema is automatically set
+    const authorizations = await this.tenantRepoFactory.executeInTransaction(
+      async (manager) => {
+        const clUserRoleRepository = manager.getRepository(ClUserRole);
+        const clRoleAuthorizationsViewRepository = manager.getRepository(
+          ClRoleAuthorizationsView,
+        );
+
+        const user = await clUserRoleRepository.findOne({
+          where: { userId },
+          select: ['roleId'],
+        });
+        if (!user) {
+          throw new Error('User not found in tenant');
+        }
+
+        const roleAuthorizations =
+          await clRoleAuthorizationsViewRepository.findOne({
+            where: { roleId: user.roleId },
+          });
+        if (!roleAuthorizations) {
+          throw new Error('Role authorizations not found');
+        }
+
+        return roleAuthorizations.authorizations;
+      },
+    );
+    return { authorizations };
   }
 }

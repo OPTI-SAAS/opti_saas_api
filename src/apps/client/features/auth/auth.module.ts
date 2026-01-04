@@ -1,9 +1,4 @@
-import {
-  BoDatabaseModule,
-  ClientDatabaseModule,
-  JwtStrategy,
-  SharedJwtModule,
-} from '@lib/shared';
+import { BoDatabaseModule, JwtStrategy, SharedJwtModule } from '@lib/shared';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
@@ -17,7 +12,6 @@ import { AuthService } from './auth.service';
   imports: [
     ConfigModule,
     BoDatabaseModule,
-    ClientDatabaseModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     SharedJwtModule,
   ],
