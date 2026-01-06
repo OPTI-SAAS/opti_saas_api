@@ -1,8 +1,12 @@
 import {
   BACKOFFICE_CONNECTION,
+  BoTenant,
   BoUser,
   BoUserTenant,
+  ClRole,
+  ClUserRole,
   PaginationQueryDto,
+  TenantRepositoryFactory,
 } from '@lib/shared';
 import {
   BadRequestException,
@@ -12,43 +16,49 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 
-import { CreateUserDto, UpdateUserDto } from './dto';
+import { AssignRoleDto, CreateUserDto, UpdateUserDto } from './dto';
+import {
+  TenantInfoDto,
+  TenantWithRoleDto,
+  UserResponseDto,
+  UserWithRolesResponseDto,
+  UserWithTenantsResponseDto,
+} from './dto/user-response.dto';
+
+interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+  hasPrev: boolean;
+  hasNext: boolean;
+}
 
 @Injectable()
 export class UsersService {
-  private userRepository: Repository<BoUser>;
-  private userTenantRepository: Repository<BoUserTenant>;
+  private readonly userRepository: Repository<BoUser>;
+  private readonly userTenantRepository: Repository<BoUserTenant>;
+  private readonly tenantRepository: Repository<BoTenant>;
 
   constructor(
     @Inject(BACKOFFICE_CONNECTION)
     private readonly boConnection: DataSource,
+    private readonly tenantRepoFactory: TenantRepositoryFactory,
   ) {
     this.userRepository = this.boConnection.getRepository(BoUser);
     this.userTenantRepository = this.boConnection.getRepository(BoUserTenant);
+    this.tenantRepository = this.boConnection.getRepository(BoTenant);
   }
 
-  private mapUserToResponse(user: BoUser) {
-    return {
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      // isOwner: user.isOwner,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-      deletedAt: user.deletedAt || null,
-      tenants:
-        user.tenantMemberships?.map((m) => ({
-          id: m.tenant.id,
-          name: m.tenant.name,
-          dbSchema: m.tenant.dbSchema,
-        })) || [],
-    };
-  }
+  // ==================== HELPER METHODS ====================
 
-  private buildPaginationMeta(page: number, limit: number, total: number) {
+  private buildPaginationMeta(
+    page: number,
+    limit: number,
+    total: number,
+  ): PaginationMeta {
     const pages = Math.ceil(total / limit);
     return {
       page,
@@ -60,42 +70,175 @@ export class UsersService {
     };
   }
 
-  private emptyPaginatedResponse(page: number, limit: number) {
-    return { data: [], meta: this.buildPaginationMeta(page, limit, 0) };
-  }
+  /**
+   * Get the tenantGroupId for a user
+   */
+  private async getUserTenantGroupId(userId: string): Promise<string> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'tenantGroupId'],
+    });
 
-  private getAccessibleTenantIds(user: BoUser): string[] {
-    return user.tenantMemberships?.map((m) => m.tenant.id) || [];
-  }
-
-  private async findPaginatedUsersByTenants(
-    tenantIds: string[],
-    page: number,
-    limit: number,
-  ) {
-    if (tenantIds.length === 0) {
-      return this.emptyPaginatedResponse(page, limit);
+    if (!user) {
+      throw new NotFoundException('User not found');
     }
 
-    // Single query with subquery - avoids N+1 problem
-    const queryBuilder = this.userRepository
-      .createQueryBuilder('user')
-      .leftJoinAndSelect('user.tenantMemberships', 'membership')
-      .leftJoinAndSelect('membership.tenant', 'tenant')
-      .where('user.isOwner = :isOwner', { isOwner: false })
-      .andWhere(
-        `user.id IN (
-          SELECT DISTINCT ut."userId" 
-          FROM bo_user_tenant ut 
-          WHERE ut."tenantId" IN (:...tenantIds)
-        )`,
-        { tenantIds },
-      )
-      .orderBy('user.createdAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit);
+    if (!user.tenantGroupId) {
+      throw new BadRequestException('User is not assigned to any tenant group');
+    }
 
-    const [data, total] = await queryBuilder.getManyAndCount();
+    return user.tenantGroupId;
+  }
+
+  /**
+   * Get all tenants for a tenant group
+   */
+  private async getTenantsByGroupId(
+    tenantGroupId: string,
+  ): Promise<BoTenant[]> {
+    return this.tenantRepository.find({
+      where: { tenantGroupId },
+      select: ['id', 'name', 'dbSchema'],
+    });
+  }
+
+  /**
+   * Verify user belongs to the same tenant group as the requester
+   */
+  private async verifyUserInSameTenantGroup(
+    targetUserId: string,
+    requesterTenantGroupId: string,
+  ): Promise<BoUser> {
+    const user = await this.userRepository.findOne({
+      where: { id: targetUserId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with id ${targetUserId} not found`);
+    }
+
+    if (user.tenantGroupId !== requesterTenantGroupId) {
+      throw new ForbiddenException('User does not belong to your tenant group');
+    }
+
+    return user;
+  }
+
+  /**
+   * Map BoUser entity to UserResponseDto
+   */
+  private toUserResponse(user: BoUser): UserResponseDto {
+    return {
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      deletedAt: user.deletedAt,
+    };
+  }
+
+  /**
+   * Map BoUser entity with tenants to UserWithTenantsResponseDto
+   */
+  private toUserWithTenantsResponse(
+    user: BoUser,
+    tenants: TenantInfoDto[],
+  ): UserWithTenantsResponseDto {
+    return {
+      ...this.toUserResponse(user),
+      tenants,
+    };
+  }
+
+  // ==================== TASK 1: POST /users ====================
+  /**
+   * Create a new user WITHOUT assigning any role or tenant
+   */
+  async create(
+    createUserDto: CreateUserDto,
+    currentUserId: string,
+  ): Promise<UserResponseDto> {
+    const { firstName, lastName, email, password } = createUserDto;
+
+    // Check if user with this email already exists
+    const existingUser = await this.userRepository.findOne({
+      where: { email },
+    });
+    if (existingUser) {
+      throw new ConflictException('User with this email already exists');
+    }
+
+    // Get the tenant group of the current user
+    const tenantGroupId = await this.getUserTenantGroupId(currentUserId);
+
+    // Create new user
+    const user = new BoUser();
+    user.firstName = firstName;
+    user.lastName = lastName ?? '';
+    user.email = email;
+    user.tenantGroupId = tenantGroupId;
+    await user.setPassword(password);
+
+    const savedUser = await this.userRepository.save(user);
+
+    return this.toUserResponse(savedUser);
+  }
+
+  // ==================== TASK 2: GET /users ====================
+  /**
+   * Get all users in the same tenant group (not filtered by selected tenant)
+   */
+  async findAll(
+    query: PaginationQueryDto,
+    currentUserId: string,
+  ): Promise<{
+    data: UserWithTenantsResponseDto[];
+    meta: PaginationMeta;
+  }> {
+    const { page = 1, limit = 10 } = query;
+
+    // Get the tenant group of the current user
+    const tenantGroupId = await this.getUserTenantGroupId(currentUserId);
+
+    // Get all users in the same tenant group with pagination
+    const [users, total] = await this.userRepository.findAndCount({
+      where: { tenantGroupId },
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    if (users.length === 0) {
+      return { data: [], meta: this.buildPaginationMeta(page, limit, 0) };
+    }
+
+    // Get all user IDs
+    const userIds = users.map((u) => u.id);
+
+    // Get user-tenant relationships for all users in one query
+    const userTenants = await this.userTenantRepository.find({
+      where: { userId: In(userIds) },
+      relations: ['tenant'],
+    });
+
+    // Group tenants by userId
+    const tenantsByUserId = new Map<string, TenantInfoDto[]>();
+    for (const ut of userTenants) {
+      if (!tenantsByUserId.has(ut.userId)) {
+        tenantsByUserId.set(ut.userId, []);
+      }
+      tenantsByUserId.get(ut.userId)!.push({
+        id: ut.tenant.id,
+        name: ut.tenant.name,
+      });
+    }
+
+    // Map users to response DTOs
+    const data = users.map((user) =>
+      this.toUserWithTenantsResponse(user, tenantsByUserId.get(user.id) ?? []),
+    );
 
     const meta = this.buildPaginationMeta(page, limit, total);
     if (meta.pages !== 0 && page > meta.pages) {
@@ -104,321 +247,259 @@ export class UsersService {
       );
     }
 
-    return { data: data.map((u) => this.mapUserToResponse(u)), meta };
+    return { data, meta };
   }
 
-  private async findUserWithRelations(id: string): Promise<BoUser | null> {
-    return this.userRepository.findOne({
-      where: { id },
-      relations: ['tenantMemberships', 'tenantMemberships.tenant'],
-    });
-  }
-
-  private async findCurrentUser(userId: string): Promise<BoUser> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: [
-        'tenantMemberships',
-        'tenantMemberships.tenant',
-        'ownedTenantGroup',
-        'ownedTenantGroup.tenants',
-      ],
-    });
-
-    if (!user) {
-      throw new NotFoundException('Current user not found');
-    }
-
-    return user;
-  }
-
-  async create(createUserDto: CreateUserDto, owner: BoUser) {
-    const { firstName, lastName, email, password, tenantIds } = createUserDto;
-
-    const existingUser = await this.userRepository.findOne({
-      where: { email },
-    });
-    if (existingUser) {
-      throw new ConflictException('User with this email already exists');
-    }
-
-    if (tenantIds?.length) {
-      this.validateTenantIds(tenantIds, owner);
-    }
-
-    const user = new BoUser();
-    Object.assign(user, { firstName, lastName, email, isOwner: false });
-    await user.setPassword(password);
-
-    const savedUser = await this.userRepository.save(user);
-
-    if (tenantIds?.length) {
-      await this.assignUserToTenants(savedUser.id, tenantIds);
-    }
-
-    return this.findOne(savedUser.id, owner);
-  }
-
-  async findAll(query: PaginationQueryDto, owner: BoUser) {
-    const { page = 1, limit = 10 } = query;
-    const ownerTenantIds = this.getAccessibleTenantIds(owner);
-    return this.findPaginatedUsersByTenants(ownerTenantIds, page, limit);
-  }
-
-  async findOne(id: string, owner: BoUser) {
-    const user = await this.userRepository.findOne({
-      where: { id /* isOwner: false */ },
-      relations: ['tenantMemberships', 'tenantMemberships.tenant'],
-    });
-
-    if (!user) {
-      throw new NotFoundException(`User with id ${id} not found`);
-    }
-
-    this.verifyUserBelongsToOwner(user, owner);
-    return this.mapUserToResponse(user);
-  }
-
-  async update(id: string, updateUserDto: UpdateUserDto, owner: BoUser) {
-    const user = await this.getUserEntity(id, owner);
-    const { firstName, lastName, tenantIds } = updateUserDto;
-
-    if (firstName !== undefined) user.firstName = firstName;
-    if (lastName !== undefined) user.lastName = lastName;
-
-    // Validate before transaction
-    if (tenantIds?.length) {
-      this.validateTenantIds(tenantIds, owner);
-    }
-
-    await this.boConnection.transaction(async (manager) => {
-      await manager.save(user);
-
-      if (tenantIds !== undefined) {
-        await manager.delete(BoUserTenant, { userId: id });
-        await this.assignUserToTenants(id, tenantIds, manager);
-      }
-    });
-
-    return this.findOne(id, owner);
-  }
-
-  async findAllForUser(
-    query: PaginationQueryDto,
-    currentUserId: string,
-    tenantId?: string,
-  ) {
-    const { page = 1, limit = 10 } = query;
-    const currentUser = await this.findCurrentUser(currentUserId);
-
-    // If tenantId is provided, filter by that specific tenant
-    if (tenantId) {
-      // Verify user has access to this tenant
-      const accessibleTenantIds = this.getAccessibleTenantIds(currentUser);
-      if (!accessibleTenantIds.includes(tenantId)) {
-        throw new ForbiddenException('You do not have access to this tenant');
-      }
-      return this.findPaginatedUsersByTenants([tenantId], page, limit);
-    }
-
-    const accessibleTenantIds = this.getAccessibleTenantIds(currentUser);
-    return this.findPaginatedUsersByTenants(accessibleTenantIds, page, limit);
-  }
-
-  async findOneForUser(id: string, currentUserId: string, tenantId?: string) {
-    const currentUser = await this.findCurrentUser(currentUserId);
-    const targetUser = await this.findUserWithRelations(id);
-
-    if (!targetUser) {
-      throw new NotFoundException(`User with id ${id} not found`);
-    }
-
-    // If tenantId is provided, verify user belongs to that tenant
-    if (tenantId) {
-      const accessibleTenantIds = this.getAccessibleTenantIds(currentUser);
-      if (!accessibleTenantIds.includes(tenantId)) {
-        throw new ForbiddenException('You do not have access to this tenant');
-      }
-
-      const targetTenantIds =
-        targetUser.tenantMemberships?.map((m) => m.tenant.id) || [];
-      if (!targetTenantIds.includes(tenantId)) {
-        throw new NotFoundException(
-          `User with id ${id} not found in the specified tenant`,
-        );
-      }
-    } else {
-      this.verifyUserAccess(targetUser, currentUser);
-    }
-
-    return this.mapUserToResponse(targetUser);
-  }
-
-  async updateForUser(
+  // ==================== TASK 3: PATCH /users/:id ====================
+  /**
+   * Update user information only (firstName, lastName, password)
+   */
+  async update(
     id: string,
     updateUserDto: UpdateUserDto,
     currentUserId: string,
-    tenantId?: string,
-  ) {
-    const currentUser = await this.findCurrentUser(currentUserId);
-    const targetUser = await this.findUserWithRelations(id);
+  ): Promise<UserResponseDto> {
+    // Get requester's tenant group
+    const tenantGroupId = await this.getUserTenantGroupId(currentUserId);
 
-    if (!targetUser) {
-      throw new NotFoundException(`User with id ${id} not found`);
-    }
+    // Verify target user is in same tenant group
+    const user = await this.verifyUserInSameTenantGroup(id, tenantGroupId);
 
-    // If tenantId is provided, verify access through that tenant
-    if (tenantId) {
-      const accessibleTenantIds = this.getAccessibleTenantIds(currentUser);
-      if (!accessibleTenantIds.includes(tenantId)) {
-        throw new ForbiddenException('You do not have access to this tenant');
-      }
+    const { firstName, lastName, password, currentPassword } = updateUserDto;
 
-      const targetTenantIds =
-        targetUser.tenantMemberships?.map((m) => m.tenant.id) || [];
-      if (!targetTenantIds.includes(tenantId)) {
-        throw new NotFoundException(
-          `User with id ${id} not found in the specified tenant`,
-        );
-      }
-    }
+    // Update basic info
+    if (firstName !== undefined) user.firstName = firstName;
+    if (lastName !== undefined) user.lastName = lastName;
 
-    const isOwnProfile = currentUserId === id;
-    // const { isOwner } = currentUser;
-
-    if (!isOwnProfile /* && !isOwner */) {
-      throw new ForbiddenException('You can only update your own profile');
-    }
-
-    if (!isOwnProfile /* && isOwner */ && !tenantId) {
-      this.verifyUserAccess(targetUser, currentUser);
-    }
-
-    const { firstName, lastName, password, currentPassword, tenantIds } =
-      updateUserDto;
-
-    if (firstName !== undefined) targetUser.firstName = firstName;
-    if (lastName !== undefined) targetUser.lastName = lastName;
-
+    // Handle password update
     if (password !== undefined) {
-      if (!isOwnProfile) {
+      // Only the user themselves can change their password
+      if (currentUserId !== id) {
         throw new ForbiddenException(
-          'Only the user can update their own password',
+          'Only the user can change their own password',
         );
       }
 
-      // Verify current password before allowing password change
       if (!currentPassword) {
         throw new BadRequestException(
           'Current password is required to change password',
         );
       }
 
-      const isCurrentPasswordValid =
-        await targetUser.checkPassword(currentPassword);
+      const isCurrentPasswordValid = await user.checkPassword(currentPassword);
       if (!isCurrentPasswordValid) {
         throw new ForbiddenException('Current password is incorrect');
       }
 
-      await targetUser.setPassword(password);
+      await user.setPassword(password);
     }
 
-    if (tenantIds !== undefined /* && !isOwner */) {
-      throw new ForbiddenException('Only owners can update tenant assignments');
-    }
+    const savedUser = await this.userRepository.save(user);
 
-    // if (tenantIds?.length) {
-    //   this.validateTenantIds(tenantIds, currentUser);
-    // }
+    return this.toUserResponse(savedUser);
+  }
 
-    await this.boConnection.transaction(async (manager) => {
-      await manager.save(targetUser);
+  // ==================== TASK 4: GET /users/:id ====================
+  /**
+   * Get one user with their tenants and roles (not filtered by selected tenant)
+   */
+  async findOne(
+    id: string,
+    currentUserId: string,
+  ): Promise<UserWithRolesResponseDto> {
+    // Get requester's tenant group
+    const tenantGroupId = await this.getUserTenantGroupId(currentUserId);
 
-      if (tenantIds !== undefined) {
-        await manager.delete(BoUserTenant, { userId: id });
-        await this.assignUserToTenants(id, tenantIds, manager);
+    // Verify target user is in same tenant group
+    const user = await this.verifyUserInSameTenantGroup(id, tenantGroupId);
+
+    // Get all tenants this user belongs to
+    const userTenants = await this.userTenantRepository.find({
+      where: { userId: id },
+      relations: ['tenant'],
+    });
+
+    // Get all tenants in this tenant group for role lookups
+    const groupTenants = await this.getTenantsByGroupId(tenantGroupId);
+
+    // Build tenant-role map by querying each tenant schema for user's role
+    const tenantsWithRoles: TenantWithRoleDto[] = [];
+
+    for (const ut of userTenants) {
+      const tenant = ut.tenant;
+      let role: { id: string; name: string } | undefined;
+
+      // Find the tenant in group tenants to get dbSchema
+      const tenantInfo = groupTenants.find((t) => t.id === tenant.id);
+
+      if (tenantInfo) {
+        try {
+          // Query the tenant's schema for user's role using ALS
+          const userRole = await this.tenantRepoFactory.executeInTransaction(
+            async (manager) => {
+              // Set the schema for this specific tenant
+              await manager.query(
+                `SET LOCAL search_path TO "${tenantInfo.dbSchema}", public;`,
+              );
+
+              const userRoleRepo = manager.getRepository(ClUserRole);
+              const clRoleRepo = manager.getRepository(ClRole);
+
+              const userRoleRecord = await userRoleRepo.findOne({
+                where: { userId: id },
+                select: ['roleId'],
+              });
+
+              if (userRoleRecord) {
+                const roleRecord = await clRoleRepo.findOne({
+                  where: { id: userRoleRecord.roleId },
+                  select: ['id', 'name'],
+                });
+                return roleRecord;
+              }
+              return null;
+            },
+          );
+
+          if (userRole) {
+            role = { id: userRole.id, name: userRole.name };
+          }
+        } catch {
+          // If tenant schema query fails, continue without role
+        }
       }
-    });
 
-    return this.findOneForUser(id, currentUserId, tenantId);
-  }
-
-  async remove(id: string, owner: BoUser): Promise<{ message: string }> {
-    await this.findOne(id, owner);
-    await this.userRepository.softDelete(id);
-
-    return { message: `User with id ${id} has been deleted` };
-  }
-
-  private async getUserEntity(id: string, owner: BoUser): Promise<BoUser> {
-    const user = await this.userRepository.findOne({
-      where: { id /* isOwner: false */ },
-      relations: ['tenantMemberships', 'tenantMemberships.tenant'],
-    });
-
-    if (!user) {
-      throw new NotFoundException(`User with id ${id} not found`);
+      tenantsWithRoles.push({
+        id: tenant.id,
+        name: tenant.name,
+        role,
+      });
     }
 
-    this.verifyUserBelongsToOwner(user, owner);
-    return user;
+    return {
+      ...this.toUserResponse(user),
+      tenants: tenantsWithRoles,
+    };
   }
 
-  private validateTenantIds(tenantIds: string[], owner: BoUser): void {
-    const ownerTenantIds = this.getAccessibleTenantIds(owner);
-    const invalidTenant = tenantIds.find(
-      (tid) => !ownerTenantIds.includes(tid),
-    );
-    if (invalidTenant) {
-      throw new BadRequestException(
-        `Tenant with id ${invalidTenant} does not belong to your tenant group`,
-      );
-    }
-  }
-
-  private verifyUserBelongsToOwner(user: BoUser, owner: BoUser): void {
-    const ownerTenantIds = this.getAccessibleTenantIds(owner);
-    const userTenantIds = user.tenantMemberships?.map((m) => m.tenant.id) || [];
-
-    if (
-      userTenantIds.length > 0 &&
-      !userTenantIds.some((id) => ownerTenantIds.includes(id))
-    ) {
-      throw new NotFoundException(`User with id ${user.id} not found`);
-    }
-  }
-
-  private verifyUserAccess(targetUser: BoUser, currentUser: BoUser): void {
-    const accessibleTenantIds = this.getAccessibleTenantIds(currentUser);
-    const targetTenantIds =
-      targetUser.tenantMemberships?.map((m) => m.tenant.id) || [];
-
-    if (
-      targetTenantIds.length > 0 &&
-      !targetTenantIds.some((id) => accessibleTenantIds.includes(id))
-    ) {
-      throw new NotFoundException(`User with id ${targetUser.id} not found`);
-    }
-  }
-
-  private async assignUserToTenants(
+  // ==================== TASK 5: PUT /users/:user_id/assign_role ====================
+  /**
+   * Assign roles to a user in multiple tenants
+   * Payload: { assignments: [{ tenant_id, role_id }, ...] }
+   */
+  async assignRoles(
     userId: string,
-    tenantIds: string[],
-    manager?: import('typeorm').EntityManager,
-  ): Promise<void> {
-    if (tenantIds.length === 0) return;
+    assignRoleDto: AssignRoleDto,
+    currentUserId: string,
+  ): Promise<{
+    message: string;
+    assignments: { tenant_id: string; role_id: string; success: boolean }[];
+  }> {
+    // Get requester's tenant group
+    const tenantGroupId = await this.getUserTenantGroupId(currentUserId);
 
-    const userTenants = tenantIds.map((tenantId) => {
-      const userTenant = new BoUserTenant();
-      userTenant.userId = userId;
-      userTenant.tenantId = tenantId;
-      return userTenant;
-    });
+    // Verify target user is in same tenant group
+    await this.verifyUserInSameTenantGroup(userId, tenantGroupId);
 
-    if (manager) {
-      await manager.save(userTenants);
-    } else {
-      await this.userTenantRepository.save(userTenants);
+    // Get all tenants in this tenant group
+    const groupTenants = await this.getTenantsByGroupId(tenantGroupId);
+    const groupTenantIds = new Set<string>(groupTenants.map((t) => t.id));
+    const tenantSchemaMap = new Map<string, string>(
+      groupTenants.map((t) => [t.id, t.dbSchema]),
+    );
+
+    // Validate all tenant IDs belong to the same tenant group
+    for (const assignment of assignRoleDto.assignments) {
+      const tenantId: string = assignment.tenant_id;
+      if (!groupTenantIds.has(tenantId)) {
+        throw new BadRequestException(
+          `Tenant with id ${tenantId} does not belong to your tenant group`,
+        );
+      }
     }
+
+    // Process each assignment
+    const results: { tenant_id: string; role_id: string; success: boolean }[] =
+      [];
+
+    for (const assignment of assignRoleDto.assignments) {
+      const tenantId: string = assignment.tenant_id;
+      const roleId: string = assignment.role_id;
+      const dbSchema = tenantSchemaMap.get(tenantId)!;
+
+      try {
+        await this.tenantRepoFactory.executeInTransaction(async (manager) => {
+          // Set the schema for this specific tenant
+          await manager.query(
+            `SET LOCAL search_path TO "${dbSchema}", public;`,
+          );
+
+          const userRoleRepo = manager.getRepository(ClUserRole);
+          const clRoleRepo = manager.getRepository(ClRole);
+
+          // Verify the role exists in this tenant's schema
+          const roleExists = await clRoleRepo.findOne({
+            where: { id: roleId },
+            select: ['id'],
+          });
+
+          if (!roleExists) {
+            throw new NotFoundException(
+              `Role with id ${roleId} not found in tenant ${tenantId}`,
+            );
+          }
+
+          // Check if user already has a role in this tenant
+          const existingUserRole = await userRoleRepo.findOne({
+            where: { userId },
+            select: ['id'],
+          });
+
+          if (existingUserRole) {
+            // Update existing role
+            await userRoleRepo.update(existingUserRole.id, {
+              roleId,
+            });
+          } else {
+            // Create new role assignment
+            const newUserRole = userRoleRepo.create({
+              userId,
+              roleId,
+            });
+            await userRoleRepo.save(newUserRole);
+          }
+        });
+
+        // Also ensure user is assigned to this tenant in backoffice.user_tenants
+        const existingUserTenant = await this.userTenantRepository.findOne({
+          where: { userId, tenantId },
+        });
+
+        if (!existingUserTenant) {
+          const userTenant = new BoUserTenant();
+          userTenant.userId = userId;
+          userTenant.tenantId = tenantId;
+          await this.userTenantRepository.save(userTenant);
+        }
+
+        results.push({
+          tenant_id: tenantId,
+          role_id: roleId,
+          success: true,
+        });
+      } catch (error) {
+        results.push({
+          tenant_id: tenantId,
+          role_id: roleId,
+          success: false,
+        });
+        throw error;
+      }
+    }
+
+    return {
+      message: 'Role assignments processed successfully',
+      assignments: results,
+    };
   }
 }

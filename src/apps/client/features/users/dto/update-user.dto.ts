@@ -1,17 +1,50 @@
-import { BoCreateUserDto } from '@lib/shared/dto/bo/create-user.bo.dto';
-import { ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsArray,
+  IsAlphanumeric,
   IsNotEmpty,
   IsOptional,
   IsString,
-  IsUUID,
+  Length,
+  Matches,
+  MaxLength,
   ValidateIf,
 } from 'class-validator';
 
-export class UpdateUserDto extends PartialType(
-  OmitType(BoCreateUserDto, ['email']),
-) {
+import { CLIENT_USER_PASSWORD_REGEX } from '@lib/shared';
+
+/**
+ * DTO for updating user information.
+ * Note: This endpoint only updates user info (firstName, lastName, password).
+ * Tenant and role assignments are managed via separate endpoints.
+ */
+export class UpdateUserDto {
+  @IsOptional()
+  @MaxLength(100)
+  @IsAlphanumeric()
+  @ApiPropertyOptional({
+    description: 'First name of the user',
+    example: 'John',
+  })
+  firstName?: string;
+
+  @IsOptional()
+  @MaxLength(100)
+  @IsAlphanumeric()
+  @ApiPropertyOptional({
+    description: 'Last name of the user',
+    example: 'Doe',
+  })
+  lastName?: string;
+
+  @IsOptional()
+  @Matches(CLIENT_USER_PASSWORD_REGEX, { message: 'Password too weak' })
+  @Length(6, 20)
+  @ApiPropertyOptional({
+    description: 'New password for the user account',
+    example: 'NewSecurePass123',
+  })
+  password?: string;
+
   /**
    * Current password is required when updating password.
    * This ensures the user knows their current password before changing it.
@@ -26,14 +59,4 @@ export class UpdateUserDto extends PartialType(
     example: 'OldPassword123',
   })
   currentPassword?: string;
-
-  @IsOptional()
-  @IsArray()
-  @IsUUID('4', { each: true })
-  @ApiPropertyOptional({
-    description: 'Array of tenant IDs to assign the user to (owners only)',
-    example: ['39182062-6c22-470e-b335-946b4db5f8dc'],
-    type: [String],
-  })
-  tenantIds?: string[];
 }
