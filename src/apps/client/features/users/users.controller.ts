@@ -1,4 +1,5 @@
 import {
+  BoUser,
   ClientController,
   CurrentUser,
   JwtAuthGuard,
@@ -28,9 +29,8 @@ import {
   AssignRoleDto,
   CreateUserDto,
   PaginatedUsersResponseDto,
+  TenantWithRoleDto,
   UpdateUserDto,
-  UserResponseDto,
-  UserWithRolesResponseDto,
 } from './dto';
 import { UsersService } from './users.service';
 
@@ -51,11 +51,11 @@ export class UsersController {
     description:
       'Creates a user in the same tenant group. Does not assign any tenant or role.',
   })
-  @ApiCreatedResponse({ type: UserResponseDto })
+  @ApiCreatedResponse({ type: BoUser })
   async create(
     @Body() createUserDto: CreateUserDto,
     @CurrentUser() user: AuthenticatedUser,
-  ): Promise<UserResponseDto> {
+  ): Promise<BoUser> {
     return this.usersService.create(createUserDto, user.userId);
   }
 
@@ -87,11 +87,11 @@ export class UsersController {
     description:
       'Returns user information with their tenant and role assignments. Not filtered by selected tenant.',
   })
-  @ApiOkResponse({ type: UserWithRolesResponseDto })
+  @ApiOkResponse({ type: BoUser })
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
-  ): Promise<UserWithRolesResponseDto> {
+  ): Promise<BoUser & { tenants: TenantWithRoleDto[] }> {
     return this.usersService.findOne(id, user.userId);
   }
 
@@ -105,12 +105,12 @@ export class UsersController {
     description:
       'Updates user information (firstName, lastName, password). Does not modify tenant or role assignments.',
   })
-  @ApiOkResponse({ type: UserResponseDto })
+  @ApiOkResponse({ type: BoUser })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateUserDto: UpdateUserDto,
     @CurrentUser() user: AuthenticatedUser,
-  ): Promise<UserResponseDto> {
+  ): Promise<BoUser> {
     return this.usersService.update(id, updateUserDto, user.userId);
   }
 

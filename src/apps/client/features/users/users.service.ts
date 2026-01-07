@@ -5,6 +5,7 @@ import {
   BoUserTenant,
   ClRole,
   ClUserRole,
+  handleDbError,
   PaginationQueryDto,
   TenantRepositoryFactory,
 } from '@lib/shared';
@@ -14,18 +15,13 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, In, Repository } from 'typeorm';
 
 import { AssignRoleDto, CreateUserDto, UpdateUserDto } from './dto';
-import {
-  TenantInfoDto,
-  TenantWithRoleDto,
-  UserResponseDto,
-  UserWithRolesResponseDto,
-  UserWithTenantsResponseDto,
-} from './dto/user-response.dto';
+import { TenantWithRoleDto } from './dto/user-response.dto';
 
 interface PaginationMeta {
   page: number;
@@ -124,42 +120,15 @@ export class UsersService {
     return user;
   }
 
-  /**
-   * Map BoUser entity to UserResponseDto
-   */
-  private toUserResponse(user: BoUser): UserResponseDto {
-    return {
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-      deletedAt: user.deletedAt,
-    };
-  }
-
-  /**
-   * Map BoUser entity with tenants to UserWithTenantsResponseDto
-   */
-  private toUserWithTenantsResponse(
-    user: BoUser,
-    tenants: TenantInfoDto[],
-  ): UserWithTenantsResponseDto {
-    return {
-      ...this.toUserResponse(user),
-      tenants,
-    };
-  }
-
   // ==================== TASK 1: POST /users ====================
   /**
    * Create a new user WITHOUT assigning any role or tenant
+   * Returns BoUser entity - @Exclude handles serialization
    */
   async create(
     createUserDto: CreateUserDto,
     currentUserId: string,
-  ): Promise<UserResponseDto> {
+  ): Promise<BoUser> {
     const { firstName, lastName, email, password } = createUserDto;
 
     // Check if user with this email already exists
@@ -181,20 +150,23 @@ export class UsersService {
     user.tenantGroupId = tenantGroupId;
     await user.setPassword(password);
 
-    const savedUser = await this.userRepository.save(user);
-
-    return this.toUserResponse(savedUser);
+    try {
+      return await this.userRepository.save(user);
+    } catch (error) {
+      handleDbError(error);
+    }
   }
 
   // ==================== TASK 2: GET /users ====================
   /**
    * Get all users in the same tenant group (not filtered by selected tenant)
+   * Returns BoUser entities with tenants and roles - @Exclude handles serialization
    */
   async findAll(
     query: PaginationQueryDto,
     currentUserId: string,
   ): Promise<{
-    data: UserWithTenantsResponseDto[];
+    data: (BoUser & { tenants: TenantWithRoleDto[] })[];
     meta: PaginationMeta;
   }> {
     const { page = 1, limit = 10 } = query;
@@ -223,21 +195,71 @@ export class UsersService {
       relations: ['tenant'],
     });
 
-    // Group tenants by userId
-    const tenantsByUserId = new Map<string, TenantInfoDto[]>();
+    // Get all tenants in this tenant group for role lookups
+    const groupTenants = await this.getTenantsByGroupId(tenantGroupId);
+    const tenantSchemaMap = new Map<string, string>(
+      groupTenants.map((t) => [t.id, t.dbSchema]),
+    );
+
+    // Build user -> tenant -> role mapping
+    const tenantsByUserId = new Map<string, TenantWithRoleDto[]>();
+
     for (const ut of userTenants) {
-      if (!tenantsByUserId.has(ut.userId)) {
-        tenantsByUserId.set(ut.userId, []);
+      const tenantId = ut.tenant.id;
+      const userId = ut.userId;
+      const dbSchema = tenantSchemaMap.get(tenantId);
+
+      let role: { id: string; name: string } | undefined;
+
+      if (dbSchema) {
+        try {
+          // Query the tenant's schema for user's role using ALS
+          const userRole = await this.tenantRepoFactory.executeInTransaction(
+            async (manager) => {
+              await manager.query(
+                `SET LOCAL search_path TO "${dbSchema}", public;`,
+              );
+
+              const userRoleRepo = manager.getRepository(ClUserRole);
+              const clRoleRepo = manager.getRepository(ClRole);
+
+              const userRoleRecord = await userRoleRepo.findOne({
+                where: { userId },
+                select: ['roleId'],
+              });
+
+              if (userRoleRecord) {
+                const roleRecord = await clRoleRepo.findOne({
+                  where: { id: userRoleRecord.roleId },
+                  select: ['id', 'name'],
+                });
+                return roleRecord;
+              }
+              return null;
+            },
+          );
+
+          if (userRole) {
+            role = { id: userRole.id, name: userRole.name };
+          }
+        } catch {
+          // If tenant schema query fails, continue without role
+        }
       }
-      tenantsByUserId.get(ut.userId)!.push({
+
+      if (!tenantsByUserId.has(userId)) {
+        tenantsByUserId.set(userId, []);
+      }
+      tenantsByUserId.get(userId)!.push({
         id: ut.tenant.id,
         name: ut.tenant.name,
+        role,
       });
     }
 
-    // Map users to response DTOs
+    // Attach tenants with roles to users
     const data = users.map((user) =>
-      this.toUserWithTenantsResponse(user, tenantsByUserId.get(user.id) ?? []),
+      Object.assign(user, { tenants: tenantsByUserId.get(user.id) ?? [] }),
     );
 
     const meta = this.buildPaginationMeta(page, limit, total);
@@ -253,12 +275,13 @@ export class UsersService {
   // ==================== TASK 3: PATCH /users/:id ====================
   /**
    * Update user information only (firstName, lastName, password)
+   * Returns BoUser entity - @Exclude handles serialization
    */
   async update(
     id: string,
     updateUserDto: UpdateUserDto,
     currentUserId: string,
-  ): Promise<UserResponseDto> {
+  ): Promise<BoUser> {
     // Get requester's tenant group
     const tenantGroupId = await this.getUserTenantGroupId(currentUserId);
 
@@ -266,6 +289,17 @@ export class UsersService {
     const user = await this.verifyUserInSameTenantGroup(id, tenantGroupId);
 
     const { firstName, lastName, password, currentPassword } = updateUserDto;
+
+    // Validate at least one field is being updated
+    if (
+      firstName === undefined &&
+      lastName === undefined &&
+      password === undefined
+    ) {
+      throw new BadRequestException(
+        'At least one field must be provided for update',
+      );
+    }
 
     // Update basic info
     if (firstName !== undefined) user.firstName = firstName;
@@ -294,19 +328,22 @@ export class UsersService {
       await user.setPassword(password);
     }
 
-    const savedUser = await this.userRepository.save(user);
-
-    return this.toUserResponse(savedUser);
+    try {
+      return await this.userRepository.save(user);
+    } catch (error) {
+      handleDbError(error);
+    }
   }
 
   // ==================== TASK 4: GET /users/:id ====================
   /**
    * Get one user with their tenants and roles (not filtered by selected tenant)
+   * Returns BoUser entity with tenants - @Exclude handles serialization
    */
   async findOne(
     id: string,
     currentUserId: string,
-  ): Promise<UserWithRolesResponseDto> {
+  ): Promise<BoUser & { tenants: TenantWithRoleDto[] }> {
     // Get requester's tenant group
     const tenantGroupId = await this.getUserTenantGroupId(currentUserId);
 
@@ -376,10 +413,7 @@ export class UsersService {
       });
     }
 
-    return {
-      ...this.toUserResponse(user),
-      tenants: tenantsWithRoles,
-    };
+    return Object.assign(user, { tenants: tenantsWithRoles });
   }
 
   // ==================== TASK 5: PUT /users/:user_id/assign_role ====================
@@ -488,12 +522,12 @@ export class UsersService {
           success: true,
         });
       } catch (error) {
-        results.push({
-          tenant_id: tenantId,
-          role_id: roleId,
-          success: false,
-        });
-        throw error;
+        // Re-throw NotFoundException for invalid role
+        if (error instanceof NotFoundException) {
+          throw error;
+        }
+        // Handle DB errors
+        handleDbError(error);
       }
     }
 
