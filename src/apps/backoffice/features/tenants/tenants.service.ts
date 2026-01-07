@@ -10,7 +10,7 @@ import {
   ClUserRole,
   getTenantConnection,
 } from '@lib/shared';
-import { Inject, Injectable } from '@nestjs/common';
+import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 
 import { CreateTenantWithOwnerDto } from './dto/create-tenant-with-owner.dto';
@@ -31,7 +31,18 @@ export class TenantsService {
         const tenantRepository = manager.getRepository(BoTenant);
         const userRepository = manager.getRepository(BoUser);
         const userTenantRepository = manager.getRepository(BoUserTenant);
-
+        const existingOwner = await ownerRepository.find({
+          where: { email: createTenantWithOwnerDto.email },
+        });
+        if (existingOwner.length > 0) {
+          throw new ConflictException('Owner with this email already exists');
+        }
+        const existingUser = await userRepository.find({
+          where: { email: createTenantWithOwnerDto.adminEmail },
+        });
+        if (existingUser.length > 0) {
+          throw new ConflictException('User with this email already exists');
+        }
         let createdOwner = ownerRepository.create({
           firstName: createTenantWithOwnerDto.firstName,
           lastName: createTenantWithOwnerDto.lastName,
