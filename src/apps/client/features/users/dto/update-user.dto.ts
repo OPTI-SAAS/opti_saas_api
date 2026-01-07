@@ -1,3 +1,4 @@
+import { CLIENT_USER_PASSWORD_REGEX } from '@lib/shared';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsAlphanumeric,
@@ -9,8 +10,6 @@ import {
   MaxLength,
   ValidateIf,
 } from 'class-validator';
-
-import { CLIENT_USER_PASSWORD_REGEX } from '@lib/shared';
 
 /**
  * DTO for updating user information.

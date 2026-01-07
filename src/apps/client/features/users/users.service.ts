@@ -15,7 +15,6 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { DataSource, In, Repository } from 'typeorm';

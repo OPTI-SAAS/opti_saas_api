@@ -1,3 +1,4 @@
+import { CLIENT_USER_PASSWORD_REGEX } from '@lib/shared';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsAlphanumeric,
@@ -8,8 +9,6 @@ import {
   Matches,
   MaxLength,
 } from 'class-validator';
-
-import { CLIENT_USER_PASSWORD_REGEX } from '@lib/shared';
 
 /**
  * DTO for creating a new user.
