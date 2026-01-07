@@ -9,6 +9,11 @@ import {
 } from 'class-validator';
 
 export class CreateTenantDto {
+  @ApiProperty({
+    description: 'Name of the tenant',
+    example: 'Acme Corporation',
+    type: String,
+  })
   @IsString()
   @Length(1, 63)
   @Matches(/^[^\d][\p{L}\p{N}\s_-]*$/u, {
