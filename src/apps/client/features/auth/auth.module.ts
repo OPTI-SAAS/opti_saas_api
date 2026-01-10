@@ -4,7 +4,6 @@ import { ConfigModule } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
 
 import { AuthClientController } from './auth.client.controller';
-import { AuthClientService } from './auth.client.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 
@@ -16,7 +15,7 @@ import { AuthService } from './auth.service';
     SharedJwtModule,
   ],
   controllers: [AuthController, AuthClientController],
-  providers: [AuthService, AuthClientService, JwtStrategy],
+  providers: [AuthService, JwtStrategy],
   exports: [AuthService],
 })
 export class AuthModule {}
