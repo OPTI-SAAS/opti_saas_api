@@ -1,7 +1,20 @@
-import { BACKOFFICE_CONNECTION, BoUser } from '@lib/shared';
+import {
+  BACKOFFICE_CONNECTION,
+  BoUser,
+  ClRole,
+  ClRoleAuthorizationsView,
+  ClUserRole,
+  logcall,
+  TenantRepositoryFactory,
+} from '@lib/shared';
 import { bycryptHashPassword, comparePassword } from '@lib/shared/helpers';
 import { JwtPayload } from '@lib/shared/types';
-import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { StringValue } from 'ms';
@@ -19,6 +32,7 @@ export class AuthService {
     private readonly boConnection: DataSource,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly tenantRepoFactory: TenantRepositoryFactory,
   ) {
     this.userRepository = this.boConnection.getRepository(BoUser);
   }
@@ -170,11 +184,17 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    const tenants = user.tenantMemberships.map((membership) => ({
-      id: membership.tenant.id,
-      name: membership.tenant.name,
-      dbSchema: membership.tenant.dbSchema,
-    }));
+    const tenants = await Promise.all(
+      user.tenantMemberships.map(async (membership) => {
+        const tenantId = membership.tenant.id;
+        const tenantRoles = await this.getTenantRoles(tenantId);
+        return {
+          id: membership.tenant.id,
+          name: membership.tenant.name,
+          roles: tenantRoles,
+        };
+      }),
+    );
 
     return {
       id: user.id,
@@ -186,5 +206,54 @@ export class AuthService {
       updatedAt: user.updatedAt,
       tenants,
     };
+  }
+
+  async getTenantRoles(tenantId: string) {
+    try {
+      const roles = await this.tenantRepoFactory.executeInTransaction(
+        async (manager) => {
+          const clRoleRepository = manager.getRepository(ClRole);
+          return clRoleRepository.find();
+        },
+        tenantId,
+      );
+      return roles;
+    } catch (error) {
+      throw new InternalServerErrorException(error, {
+        description: 'Error fetching tenant roles ',
+      });
+    }
+  }
+
+  @logcall()
+  async getUserOptions(userId: string) {
+    // Execute within tenant context - schema is automatically set
+    const authorizations = await this.tenantRepoFactory.executeInTransaction(
+      async (manager) => {
+        const clUserRoleRepository = manager.getRepository(ClUserRole);
+        const clRoleAuthorizationsViewRepository = manager.getRepository(
+          ClRoleAuthorizationsView,
+        );
+
+        const user = await clUserRoleRepository.findOne({
+          where: { userId },
+          select: ['roleId'],
+        });
+        if (!user) {
+          throw new Error('User not found in tenant');
+        }
+
+        const roleAuthorizations =
+          await clRoleAuthorizationsViewRepository.findOne({
+            where: { roleId: user.roleId },
+          });
+        if (!roleAuthorizations) {
+          throw new Error('Role authorizations not found');
+        }
+
+        return roleAuthorizations.authorizations;
+      },
+    );
+    return { authorizations };
   }
 }

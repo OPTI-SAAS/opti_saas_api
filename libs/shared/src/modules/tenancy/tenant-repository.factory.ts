@@ -15,7 +15,8 @@ export class TenantRepositoryFactory {
    */
   async executeInTransaction<T>(
     callback: (manager: EntityManager) => Promise<T>,
+    tenantId?: string,
   ): Promise<T> {
-    return this.dataSourceManager.executeInTransaction(callback);
+    return this.dataSourceManager.executeInTransaction(callback, tenantId);
   }
 }
