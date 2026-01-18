@@ -52,10 +52,12 @@ export class BoUser extends BaseEntity {
     nullable: true,
     unique: false,
   })
+  @Exclude()
   tenantGroupId!: string;
 
   @ManyToOne(() => BoTenantGroup, { nullable: true })
   @JoinColumn({ name: 'tenant_group_id' })
+  @Exclude()
   tenantGroup!: BoTenantGroup;
 
   constructor(data: Partial<BoUser> = {}) {
