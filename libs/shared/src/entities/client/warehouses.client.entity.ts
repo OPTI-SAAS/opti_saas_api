@@ -1,5 +1,6 @@
 import { BaseEntity } from '@lib/shared/base';
-import { TAddress, WarehouseType } from '@lib/shared/types';
+import { WarehouseType } from '@lib/shared/enums/client/warehouse.client.enum';
+import { TAddress } from '@lib/shared/types';
 import { Column, Entity } from 'typeorm';
 
 @Entity('warehouses')

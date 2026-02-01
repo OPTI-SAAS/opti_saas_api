@@ -1,4 +1,7 @@
-import { WAREHOUSE_TYPES, WarehouseType } from '@lib/shared/types';
+import {
+  WAREHOUSE_TYPES,
+  WarehouseType,
+} from '@lib/shared/enums/client/warehouse.client.enum';
 import { Type } from 'class-transformer';
 import {
   IsDefined,
