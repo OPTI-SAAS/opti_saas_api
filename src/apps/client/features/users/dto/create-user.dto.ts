@@ -1,12 +1,10 @@
-import { CLIENT_USER_PASSWORD_REGEX } from '@lib/shared';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  IsAlphanumeric,
   IsEmail,
   IsNotEmpty,
   IsOptional,
-  Length,
-  Matches,
+  IsString,
+  IsStrongPassword,
   MaxLength,
 } from 'class-validator';
 
@@ -16,8 +14,8 @@ import {
  */
 export class CreateUserDto {
   @IsNotEmpty()
+  @IsString()
   @MaxLength(100)
-  @IsAlphanumeric()
   @ApiProperty({
     description: 'First name of the user',
     example: 'John',
@@ -25,8 +23,8 @@ export class CreateUserDto {
   firstName!: string;
 
   @IsOptional()
+  @IsString()
   @MaxLength(100)
-  @IsAlphanumeric()
   @ApiPropertyOptional({
     description: 'Last name of the user',
     example: 'Doe',
@@ -43,11 +41,10 @@ export class CreateUserDto {
   email!: string;
 
   @IsNotEmpty()
-  @Matches(CLIENT_USER_PASSWORD_REGEX, { message: 'Password too weak' })
-  @Length(6, 20)
+  @IsStrongPassword()
   @ApiProperty({
     description: 'Password for the user account',
-    example: 'SecurePass123',
+    example: 'SecurePass123!',
   })
   password!: string;
 }

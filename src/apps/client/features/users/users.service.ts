@@ -7,7 +7,7 @@ import {
   ClUserRole,
   handleDbError,
   PaginationQueryDto,
-  TenantRepositoryFactory,
+  TenantDataSourceManager,
 } from '@lib/shared';
 import {
   BadRequestException,
@@ -15,9 +15,10 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 
 import { AssignRoleDto, CreateUserDto, UpdateUserDto } from './dto';
 import { TenantWithRoleDto } from './dto/user-response.dto';
@@ -27,12 +28,11 @@ interface PaginationMeta {
   limit: number;
   total: number;
   pages: number;
-  hasPrev: boolean;
-  hasNext: boolean;
 }
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
   private readonly userRepository: Repository<BoUser>;
   private readonly userTenantRepository: Repository<BoUserTenant>;
   private readonly tenantRepository: Repository<BoTenant>;
@@ -40,7 +40,7 @@ export class UsersService {
   constructor(
     @Inject(BACKOFFICE_CONNECTION)
     private readonly boConnection: DataSource,
-    private readonly tenantRepoFactory: TenantRepositoryFactory,
+    private readonly tenantDataSourceManager: TenantDataSourceManager,
   ) {
     this.userRepository = this.boConnection.getRepository(BoUser);
     this.userTenantRepository = this.boConnection.getRepository(BoUserTenant);
@@ -60,8 +60,6 @@ export class UsersService {
       limit,
       total,
       pages,
-      hasPrev: page > 1,
-      hasNext: page < pages,
     };
   }
 
@@ -98,25 +96,42 @@ export class UsersService {
   }
 
   /**
-   * Verify user belongs to the same tenant group as the requester
+   * Verify that two users belong to the same tenant group
+   * Returns both users if verification passes
    */
-  private async verifyUserInSameTenantGroup(
+  private async verifyUsersInSameTenantGroup(
+    currentUserId: string,
     targetUserId: string,
-    requesterTenantGroupId: string,
-  ): Promise<BoUser> {
-    const user = await this.userRepository.findOne({
-      where: { id: targetUserId },
-    });
+  ): Promise<{ currentUser: BoUser; targetUser: BoUser }> {
+    const [currentUser, targetUser] = await Promise.all([
+      this.userRepository.findOne({
+        where: { id: currentUserId },
+        select: ['id', 'tenantGroupId'],
+      }),
+      this.userRepository.findOne({
+        where: { id: targetUserId },
+      }),
+    ]);
 
-    if (!user) {
+    if (!currentUser) {
+      throw new NotFoundException('Current user not found');
+    }
+
+    if (!currentUser.tenantGroupId) {
+      throw new BadRequestException(
+        'Current user is not assigned to any tenant group',
+      );
+    }
+
+    if (!targetUser) {
       throw new NotFoundException(`User with id ${targetUserId} not found`);
     }
 
-    if (user.tenantGroupId !== requesterTenantGroupId) {
+    if (targetUser.tenantGroupId !== currentUser.tenantGroupId) {
       throw new ForbiddenException('User does not belong to your tenant group');
     }
 
-    return user;
+    return { currentUser, targetUser };
   }
 
   // ==================== TASK 1: POST /users ====================
@@ -159,13 +174,13 @@ export class UsersService {
   // ==================== TASK 2: GET /users ====================
   /**
    * Get all users in the same tenant group (not filtered by selected tenant)
-   * Returns BoUser entities with tenants and roles - @Exclude handles serialization
+   * Returns BoUser entities only - no tenant/role info for list view
    */
   async findAll(
     query: PaginationQueryDto,
     currentUserId: string,
   ): Promise<{
-    data: (BoUser & { tenants: TenantWithRoleDto[] })[];
+    data: BoUser[];
     meta: PaginationMeta;
   }> {
     const { page = 1, limit = 10 } = query;
@@ -181,86 +196,6 @@ export class UsersService {
       take: limit,
     });
 
-    if (users.length === 0) {
-      return { data: [], meta: this.buildPaginationMeta(page, limit, 0) };
-    }
-
-    // Get all user IDs
-    const userIds = users.map((u) => u.id);
-
-    // Get user-tenant relationships for all users in one query
-    const userTenants = await this.userTenantRepository.find({
-      where: { userId: In(userIds) },
-      relations: ['tenant'],
-    });
-
-    // Get all tenants in this tenant group for role lookups
-    const groupTenants = await this.getTenantsByGroupId(tenantGroupId);
-    const tenantSchemaMap = new Map<string, string>(
-      groupTenants.map((t) => [t.id, t.dbSchema]),
-    );
-
-    // Build user -> tenant -> role mapping
-    const tenantsByUserId = new Map<string, TenantWithRoleDto[]>();
-
-    for (const ut of userTenants) {
-      const tenantId = ut.tenant.id;
-      const userId = ut.userId;
-      const dbSchema = tenantSchemaMap.get(tenantId);
-
-      let role: { id: string; name: string } | undefined;
-
-      if (dbSchema) {
-        try {
-          // Query the tenant's schema for user's role using ALS
-          const userRole = await this.tenantRepoFactory.executeInTransaction(
-            async (manager) => {
-              await manager.query(
-                `SET LOCAL search_path TO "${dbSchema}", public;`,
-              );
-
-              const userRoleRepo = manager.getRepository(ClUserRole);
-              const clRoleRepo = manager.getRepository(ClRole);
-
-              const userRoleRecord = await userRoleRepo.findOne({
-                where: { userId },
-                select: ['roleId'],
-              });
-
-              if (userRoleRecord) {
-                const roleRecord = await clRoleRepo.findOne({
-                  where: { id: userRoleRecord.roleId },
-                  select: ['id', 'name'],
-                });
-                return roleRecord;
-              }
-              return null;
-            },
-          );
-
-          if (userRole) {
-            role = { id: userRole.id, name: userRole.name };
-          }
-        } catch {
-          // If tenant schema query fails, continue without role
-        }
-      }
-
-      if (!tenantsByUserId.has(userId)) {
-        tenantsByUserId.set(userId, []);
-      }
-      tenantsByUserId.get(userId)!.push({
-        id: ut.tenant.id,
-        name: ut.tenant.name,
-        role,
-      });
-    }
-
-    // Attach tenants with roles to users
-    const data = users.map((user) =>
-      Object.assign(user, { tenants: tenantsByUserId.get(user.id) ?? [] }),
-    );
-
     const meta = this.buildPaginationMeta(page, limit, total);
     if (meta.pages !== 0 && page > meta.pages) {
       throw new NotFoundException(
@@ -268,12 +203,12 @@ export class UsersService {
       );
     }
 
-    return { data, meta };
+    return { data: users, meta };
   }
 
   // ==================== TASK 3: PATCH /users/:id ====================
   /**
-   * Update user information only (firstName, lastName, password)
+   * Update user information only (firstName, lastName)
    * Returns BoUser entity - @Exclude handles serialization
    */
   async update(
@@ -281,20 +216,16 @@ export class UsersService {
     updateUserDto: UpdateUserDto,
     currentUserId: string,
   ): Promise<BoUser> {
-    // Get requester's tenant group
-    const tenantGroupId = await this.getUserTenantGroupId(currentUserId);
+    // Verify both users exist and belong to the same tenant group
+    const { targetUser: user } = await this.verifyUsersInSameTenantGroup(
+      currentUserId,
+      id,
+    );
 
-    // Verify target user is in same tenant group
-    const user = await this.verifyUserInSameTenantGroup(id, tenantGroupId);
-
-    const { firstName, lastName, password, currentPassword } = updateUserDto;
+    const { firstName, lastName } = updateUserDto;
 
     // Validate at least one field is being updated
-    if (
-      firstName === undefined &&
-      lastName === undefined &&
-      password === undefined
-    ) {
+    if (firstName === undefined && lastName === undefined) {
       throw new BadRequestException(
         'At least one field must be provided for update',
       );
@@ -303,29 +234,6 @@ export class UsersService {
     // Update basic info
     if (firstName !== undefined) user.firstName = firstName;
     if (lastName !== undefined) user.lastName = lastName;
-
-    // Handle password update
-    if (password !== undefined) {
-      // Only the user themselves can change their password
-      if (currentUserId !== id) {
-        throw new ForbiddenException(
-          'Only the user can change their own password',
-        );
-      }
-
-      if (!currentPassword) {
-        throw new BadRequestException(
-          'Current password is required to change password',
-        );
-      }
-
-      const isCurrentPasswordValid = await user.checkPassword(currentPassword);
-      if (!isCurrentPasswordValid) {
-        throw new ForbiddenException('Current password is incorrect');
-      }
-
-      await user.setPassword(password);
-    }
 
     try {
       return await this.userRepository.save(user);
@@ -343,82 +251,80 @@ export class UsersService {
     id: string,
     currentUserId: string,
   ): Promise<BoUser & { tenants: TenantWithRoleDto[] }> {
-    // Get requester's tenant group
-    const tenantGroupId = await this.getUserTenantGroupId(currentUserId);
-
-    // Verify target user is in same tenant group
-    const user = await this.verifyUserInSameTenantGroup(id, tenantGroupId);
+    // Verify both users exist and belong to the same tenant group
+    const { currentUser, targetUser: user } =
+      await this.verifyUsersInSameTenantGroup(currentUserId, id);
 
     // Get all tenants this user belongs to
     const userTenants = await this.userTenantRepository.find({
       where: { userId: id },
-      relations: ['tenant'],
+      select: ['tenantId'],
     });
 
+    if (userTenants.length === 0) {
+      return Object.assign(user, { tenants: [] });
+    }
+
     // Get all tenants in this tenant group for role lookups
-    const groupTenants = await this.getTenantsByGroupId(tenantGroupId);
+    const groupTenants = await this.getTenantsByGroupId(
+      currentUser.tenantGroupId,
+    );
+    const tenantSchemaMap = new Map<string, string>(
+      groupTenants.map((t) => [t.id, t.dbSchema]),
+    );
 
     // Build tenant-role map by querying each tenant schema for user's role
-    const tenantsWithRoles: TenantWithRoleDto[] = [];
+    const tenantsWithRoles: TenantWithRoleDto[] = await Promise.all(
+      userTenants.map(async (ut) => {
+        const tenantId = ut.tenantId;
+        const dbSchema = tenantSchemaMap.get(tenantId);
 
-    for (const ut of userTenants) {
-      const tenant = ut.tenant;
-      let role: { id: string; name: string } | undefined;
+        if (!dbSchema) {
+          return { id: tenantId, roleId: undefined };
+        }
 
-      // Find the tenant in group tenants to get dbSchema
-      const tenantInfo = groupTenants.find((t) => t.id === tenant.id);
+        let roleId: string | undefined;
 
-      if (tenantInfo) {
         try {
-          // Query the tenant's schema for user's role using ALS
-          const userRole = await this.tenantRepoFactory.executeInTransaction(
-            async (manager) => {
-              // Set the schema for this specific tenant
-              await manager.query(
-                `SET LOCAL search_path TO "${tenantInfo.dbSchema}", public;`,
-              );
-
-              const userRoleRepo = manager.getRepository(ClUserRole);
-              const clRoleRepo = manager.getRepository(ClRole);
-
-              const userRoleRecord = await userRoleRepo.findOne({
-                where: { userId: id },
-                select: ['roleId'],
-              });
-
-              if (userRoleRecord) {
-                const roleRecord = await clRoleRepo.findOne({
-                  where: { id: userRoleRecord.roleId },
-                  select: ['id', 'name'],
+          // Query the tenant's schema for user's role
+          const userRole =
+            await this.tenantDataSourceManager.executeInTransaction(
+              async (manager) => {
+                const userRoleRepo = manager.getRepository(ClUserRole);
+                const userRoleRecord = await userRoleRepo.findOne({
+                  where: { userId: id },
+                  select: ['roleId'],
                 });
-                return roleRecord;
-              }
-              return null;
-            },
-          );
+                return userRoleRecord;
+              },
+              tenantId,
+            );
 
           if (userRole) {
-            role = { id: userRole.id, name: userRole.name };
+            roleId = userRole.roleId;
           }
-        } catch {
-          // If tenant schema query fails, continue without role
+        } catch (error) {
+          // Log error but continue without role to provide partial data
+          this.logger.warn(
+            `Failed to fetch role for user ${id} in tenant ${tenantId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
         }
-      }
 
-      tenantsWithRoles.push({
-        id: tenant.id,
-        name: tenant.name,
-        role,
-      });
-    }
+        return { id: tenantId, roleId };
+      }),
+    );
 
     return Object.assign(user, { tenants: tenantsWithRoles });
   }
 
-  // ==================== TASK 5: PUT /users/:user_id/assign_role ====================
+  // ==================== TASK 5: PUT /users/:id/assign-roles ====================
   /**
    * Assign roles to a user in multiple tenants
-   * Payload: { assignments: [{ tenant_id, role_id }, ...] }
+   * Two-layer approach:
+   * - Layer 1 [data]: Compute tenants_to_delete, tenants_to_add, tenants_with_no_changes
+   * - Layer 1 [action]: Update BoUserTenant table (delete/add)
+   * - Layer 2 [data]: Use tenants_to_add + tenants_with_no_changes
+   * - Layer 2 [action]: Assign/update roles in tenant schemas
    */
   async assignRoles(
     userId: string,
@@ -426,24 +332,23 @@ export class UsersService {
     currentUserId: string,
   ): Promise<{
     message: string;
-    assignments: { tenant_id: string; role_id: string; success: boolean }[];
+    assignments: { tenantId: string; roleId: string; success: boolean }[];
   }> {
-    // Get requester's tenant group
-    const tenantGroupId = await this.getUserTenantGroupId(currentUserId);
-
-    // Verify target user is in same tenant group
-    await this.verifyUserInSameTenantGroup(userId, tenantGroupId);
-
-    // Get all tenants in this tenant group
-    const groupTenants = await this.getTenantsByGroupId(tenantGroupId);
-    const groupTenantIds = new Set<string>(groupTenants.map((t) => t.id));
-    const tenantSchemaMap = new Map<string, string>(
-      groupTenants.map((t) => [t.id, t.dbSchema]),
+    // Verify both users exist and belong to the same tenant group
+    const { currentUser } = await this.verifyUsersInSameTenantGroup(
+      currentUserId,
+      userId,
     );
 
-    // Validate all tenant IDs belong to the same tenant group
+    // Get all tenants in this tenant group
+    const groupTenants = await this.getTenantsByGroupId(
+      currentUser.tenantGroupId,
+    );
+    const groupTenantIds = new Set<string>(groupTenants.map((t) => t.id));
+
+    // Validate all tenant IDs in request belong to the same tenant group
     for (const assignment of assignRoleDto.assignments) {
-      const tenantId: string = assignment.tenant_id;
+      const { tenantId } = assignment;
       if (!groupTenantIds.has(tenantId)) {
         throw new BadRequestException(
           `Tenant with id ${tenantId} does not belong to your tenant group`,
@@ -451,81 +356,159 @@ export class UsersService {
       }
     }
 
-    // Process each assignment
-    const results: { tenant_id: string; role_id: string; success: boolean }[] =
-      [];
+    // ==================== LAYER 1 [DATA] ====================
+    // Get user's current tenant assignments
+    const existingUserTenants = await this.userTenantRepository.find({
+      where: { userId },
+      select: ['id', 'tenantId'],
+    });
+    const existingTenantIds = new Set<string>(
+      existingUserTenants.map((ut) => ut.tenantId),
+    );
 
-    for (const assignment of assignRoleDto.assignments) {
-      const tenantId: string = assignment.tenant_id;
-      const roleId: string = assignment.role_id;
-      const dbSchema = tenantSchemaMap.get(tenantId)!;
+    // Requested tenant IDs from the DTO
+    const requestedTenantIds = new Set<string>(
+      assignRoleDto.assignments.map((a) => a.tenantId),
+    );
 
-      try {
-        await this.tenantRepoFactory.executeInTransaction(async (manager) => {
-          // Set the schema for this specific tenant
-          await manager.query(
-            `SET LOCAL search_path TO "${dbSchema}", public;`,
-          );
+    // Compute the three categories
+    const tenantsToDelete = existingUserTenants.filter(
+      (ut) => !requestedTenantIds.has(ut.tenantId),
+    );
+    const tenantsToAdd = assignRoleDto.assignments.filter(
+      (a) => !existingTenantIds.has(a.tenantId),
+    );
+    const tenantsWithNoChanges = assignRoleDto.assignments.filter((a) =>
+      existingTenantIds.has(a.tenantId),
+    );
 
-          const userRoleRepo = manager.getRepository(ClUserRole);
-          const clRoleRepo = manager.getRepository(ClRole);
+    // ==================== LAYER 1 [ACTION] ====================
+    // Delete user from tenants no longer in the assignment
+    if (tenantsToDelete.length > 0) {
+      const idsToDelete = tenantsToDelete.map((ut) => ut.id);
+      await this.userTenantRepository.delete(idsToDelete);
 
-          // Verify the role exists in this tenant's schema
-          const roleExists = await clRoleRepo.findOne({
-            where: { id: roleId },
-            select: ['id'],
-          });
-
-          if (!roleExists) {
-            throw new NotFoundException(
-              `Role with id ${roleId} not found in tenant ${tenantId}`,
+      // Also remove user roles from those tenant schemas (in parallel)
+      await Promise.all(
+        tenantsToDelete.map(async (ut) => {
+          try {
+            await this.tenantDataSourceManager.executeInTransaction(
+              async (manager) => {
+                const userRoleRepo = manager.getRepository(ClUserRole);
+                await userRoleRepo.delete({ userId });
+              },
+              ut.tenantId,
+            );
+          } catch (error) {
+            // Log error but continue to process other tenants
+            this.logger.warn(
+              `Failed to delete role for user ${userId} in tenant ${ut.tenantId}: ${error instanceof Error ? error.message : 'Unknown error'}`,
             );
           }
+        }),
+      );
+    }
 
-          // Check if user already has a role in this tenant
-          const existingUserRole = await userRoleRepo.findOne({
-            where: { userId },
-            select: ['id'],
-          });
+    // Add user to new tenants
+    if (tenantsToAdd.length > 0) {
+      const newUserTenants = tenantsToAdd.map((a) => {
+        const userTenant = new BoUserTenant();
+        userTenant.userId = userId;
+        userTenant.tenantId = a.tenantId;
+        return userTenant;
+      });
+      await this.userTenantRepository.save(newUserTenants);
+    }
 
-          if (existingUserRole) {
-            // Update existing role
-            await userRoleRepo.update(existingUserRole.id, {
-              roleId,
+    // ==================== LAYER 2 [DATA & ACTION] ====================
+    const results: { tenantId: string; roleId: string; success: boolean }[] =
+      [];
+
+    // Process tenantsToAdd: assign new roles
+    for (const assignment of tenantsToAdd) {
+      const { tenantId, roleId } = assignment;
+
+      try {
+        await this.tenantDataSourceManager.executeInTransaction(
+          async (manager) => {
+            const userRoleRepo = manager.getRepository(ClUserRole);
+            const clRoleRepo = manager.getRepository(ClRole);
+
+            // Verify the role exists in this tenant's schema
+            const roleExists = await clRoleRepo.findOne({
+              where: { id: roleId },
+              select: ['id'],
             });
-          } else {
+
+            if (!roleExists) {
+              throw new NotFoundException(
+                `Role with id ${roleId} not found in tenant ${tenantId}`,
+              );
+            }
+
             // Create new role assignment
-            const newUserRole = userRoleRepo.create({
-              userId,
-              roleId,
-            });
+            const newUserRole = userRoleRepo.create({ userId, roleId });
             await userRoleRepo.save(newUserRole);
-          }
-        });
+          },
+          tenantId,
+        );
 
-        // Also ensure user is assigned to this tenant in backoffice.user_tenants
-        const existingUserTenant = await this.userTenantRepository.findOne({
-          where: { userId, tenantId },
-        });
-
-        if (!existingUserTenant) {
-          const userTenant = new BoUserTenant();
-          userTenant.userId = userId;
-          userTenant.tenantId = tenantId;
-          await this.userTenantRepository.save(userTenant);
-        }
-
-        results.push({
-          tenant_id: tenantId,
-          role_id: roleId,
-          success: true,
-        });
+        results.push({ tenantId, roleId, success: true });
       } catch (error) {
-        // Re-throw NotFoundException for invalid role
         if (error instanceof NotFoundException) {
           throw error;
         }
-        // Handle DB errors
+        handleDbError(error);
+      }
+    }
+
+    // Process tenantsWithNoChanges: check if role changed and update if needed
+    for (const assignment of tenantsWithNoChanges) {
+      const { tenantId, roleId } = assignment;
+
+      try {
+        await this.tenantDataSourceManager.executeInTransaction(
+          async (manager) => {
+            const userRoleRepo = manager.getRepository(ClUserRole);
+            const clRoleRepo = manager.getRepository(ClRole);
+
+            // Verify the role exists in this tenant's schema
+            const roleExists = await clRoleRepo.findOne({
+              where: { id: roleId },
+              select: ['id'],
+            });
+
+            if (!roleExists) {
+              throw new NotFoundException(
+                `Role with id ${roleId} not found in tenant ${tenantId}`,
+              );
+            }
+
+            // Check existing role
+            const existingUserRole = await userRoleRepo.findOne({
+              where: { userId },
+              select: ['id', 'roleId'],
+            });
+
+            if (existingUserRole) {
+              // Only update if role is different
+              if (existingUserRole.roleId !== roleId) {
+                await userRoleRepo.update(existingUserRole.id, { roleId });
+              }
+            } else {
+              // No role exists, create one
+              const newUserRole = userRoleRepo.create({ userId, roleId });
+              await userRoleRepo.save(newUserRole);
+            }
+          },
+          tenantId,
+        );
+
+        results.push({ tenantId, roleId, success: true });
+      } catch (error) {
+        if (error instanceof NotFoundException) {
+          throw error;
+        }
         handleDbError(error);
       }
     }

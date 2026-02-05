@@ -15,7 +15,7 @@ export class RoleAssignmentDto {
     description: 'The tenant ID to assign the role in',
     example: '39182062-6c22-470e-b335-946b4db5f8dc',
   })
-  tenant_id!: string;
+  tenantId!: string;
 
   @IsNotEmpty()
   @IsUUID('4')
@@ -23,7 +23,7 @@ export class RoleAssignmentDto {
     description: 'The role ID to assign to the user',
     example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
   })
-  role_id!: string;
+  roleId!: string;
 }
 
 export class AssignRoleDto {
@@ -36,12 +36,12 @@ export class AssignRoleDto {
     type: [RoleAssignmentDto],
     example: [
       {
-        tenant_id: '39182062-6c22-470e-b335-946b4db5f8dc',
-        role_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        tenantId: '39182062-6c22-470e-b335-946b4db5f8dc',
+        roleId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
       },
       {
-        tenant_id: '12345678-1234-1234-1234-123456789012',
-        role_id: 'b2c3d4e5-f6a7-8901-bcde-f23456789012',
+        tenantId: '12345678-1234-1234-1234-123456789012',
+        roleId: 'b2c3d4e5-f6a7-8901-bcde-f23456789012',
       },
     ],
   })

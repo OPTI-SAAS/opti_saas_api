@@ -97,13 +97,13 @@ export class UsersController {
 
   /**
    * Task 3: PATCH /users/:id
-   * Update user information only (firstName, lastName, password)
+   * Update user information only (firstName, lastName)
    */
   @Patch(':id')
   @ApiOperation({
     summary: 'Update a user',
     description:
-      'Updates user information (firstName, lastName, password). Does not modify tenant or role assignments.',
+      'Updates user information (firstName, lastName). Does not modify tenant or role assignments.',
   })
   @ApiOkResponse({ type: BoUser })
   async update(
@@ -115,10 +115,10 @@ export class UsersController {
   }
 
   /**
-   * Task 5: PUT /users/:user_id/assign_role
+   * Task 5: PUT /users/:id/assign-roles
    * Assign roles to a user in multiple tenants
    */
-  @Put(':user_id/assign_role')
+  @Put(':id/assign-roles')
   @ApiOperation({
     summary: 'Assign roles to a user',
     description:
@@ -138,8 +138,8 @@ export class UsersController {
           items: {
             type: 'object',
             properties: {
-              tenant_id: { type: 'string', format: 'uuid' },
-              role_id: { type: 'string', format: 'uuid' },
+              tenantId: { type: 'string', format: 'uuid' },
+              roleId: { type: 'string', format: 'uuid' },
               success: { type: 'boolean' },
             },
           },
@@ -147,11 +147,11 @@ export class UsersController {
       },
     },
   })
-  async assignRole(
-    @Param('user_id', ParseUUIDPipe) userId: string,
+  async assignRoles(
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() assignRoleDto: AssignRoleDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.usersService.assignRoles(userId, assignRoleDto, user.userId);
+    return this.usersService.assignRoles(id, assignRoleDto, user.userId);
   }
 }
