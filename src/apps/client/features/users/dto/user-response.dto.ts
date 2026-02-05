@@ -1,5 +1,9 @@
 import { BoUser } from '@lib/shared';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ApiProperty,
+  ApiPropertyOptional,
+  IntersectionType,
+} from '@nestjs/swagger';
 
 /**
  * Tenant assignment with optional role ID
@@ -12,6 +16,27 @@ export class TenantWithRoleDto {
   @ApiPropertyOptional({ example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' })
   roleId?: string;
 }
+
+/**
+ * DTO for the tenants array on user response
+ */
+export class UserTenantsDto {
+  @ApiProperty({
+    type: [TenantWithRoleDto],
+    description:
+      'List of tenants the user belongs to with their role assignments',
+  })
+  tenants!: TenantWithRoleDto[];
+}
+
+/**
+ * Response DTO for GET /users/:id
+ * Combines BoUser fields with tenants array using TypeScript intersection
+ */
+export class UserWithTenantsResponseDto extends IntersectionType(
+  BoUser,
+  UserTenantsDto,
+) {}
 
 /**
  * Pagination meta without hasPrev/hasNext (frontend can calculate)

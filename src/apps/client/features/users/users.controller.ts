@@ -29,8 +29,8 @@ import {
   AssignRoleDto,
   CreateUserDto,
   PaginatedUsersResponseDto,
-  TenantWithRoleDto,
   UpdateUserDto,
+  UserWithTenantsResponseDto,
 } from './dto';
 import { UsersService } from './users.service';
 
@@ -38,6 +38,18 @@ import { UsersService } from './users.service';
 @ClientController('users')
 @ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard)
+/**
+ * Users Controller
+ *
+ * API Design Notes:
+ * - DELETE /users/:id was intentionally removed in this refactor
+ * - User deletion should be handled via soft-delete (setting isActive=false)
+ * - If hard delete is needed, it should cascade through:
+ *   1. Remove user roles from all tenant schemas (ClUserRole)
+ *   2. Remove user-tenant assignments (BoUserTenant)
+ *   3. Delete/deactivate user record (BoUser)
+ * - This is a breaking change from the previous API
+ */
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -87,11 +99,11 @@ export class UsersController {
     description:
       'Returns user information with their tenant and role assignments. Not filtered by selected tenant.',
   })
-  @ApiOkResponse({ type: BoUser })
+  @ApiOkResponse({ type: UserWithTenantsResponseDto })
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
-  ): Promise<BoUser & { tenants: TenantWithRoleDto[] }> {
+  ): Promise<UserWithTenantsResponseDto> {
     return this.usersService.findOne(id, user.userId);
   }
 
