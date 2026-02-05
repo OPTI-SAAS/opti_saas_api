@@ -1,4 +1,4 @@
-import { BoDatabaseModule, SharedJwtModule } from '@lib/shared';
+import { BoDatabaseModule, SharedJwtModule, TenancyModule } from '@lib/shared';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
@@ -10,6 +10,7 @@ import { UsersService } from './users.service';
   imports: [
     ConfigModule,
     BoDatabaseModule,
+    TenancyModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     SharedJwtModule,
   ],

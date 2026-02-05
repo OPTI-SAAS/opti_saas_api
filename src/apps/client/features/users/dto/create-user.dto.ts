@@ -1,16 +1,57 @@
-import { BoCreateUserDto } from '@lib/shared/dto/bo/create-user.bo.dto';
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMinSize, IsArray, IsOptional, IsUUID } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsStrongPassword,
+  MaxLength,
+} from 'class-validator';
 
-export class CreateUserDto extends BoCreateUserDto {
-  @IsOptional()
-  @IsArray()
-  @ArrayMinSize(1)
-  @IsUUID('4', { each: true })
-  @ApiPropertyOptional({
-    description: 'Array of tenant IDs to assign the user to',
-    example: ['39182062-6c22-470e-b335-946b4db5f8dc'],
-    type: [String],
+/**
+ * Base DTO with common user fields that can be shared/extended
+ */
+export class BaseUserFieldsDto {
+  @IsNotEmpty()
+  @IsString()
+  @MaxLength(100)
+  @ApiProperty({
+    description: 'First name of the user (required, non-empty)',
+    example: 'John',
   })
-  tenantIds?: string[];
+  firstName!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  @ApiPropertyOptional({
+    description:
+      'Last name of the user (optional, defaults to empty string if not provided)',
+    example: 'Doe',
+  })
+  lastName?: string;
+}
+
+/**
+ * DTO for creating a new user.
+ * Extends BaseUserFieldsDto with email and password fields.
+ * Note: This endpoint only creates the user record without assigning any tenant or role.
+ */
+export class CreateUserDto extends BaseUserFieldsDto {
+  @IsNotEmpty()
+  @IsEmail()
+  @MaxLength(100)
+  @ApiProperty({
+    description: 'Email address of the user (must be unique)',
+    example: 'john.doe@example.com',
+  })
+  email!: string;
+
+  @IsNotEmpty()
+  @IsStrongPassword()
+  @ApiProperty({
+    description: 'Password for the user account',
+    example: 'SecurePass123!',
+  })
+  password!: string;
 }

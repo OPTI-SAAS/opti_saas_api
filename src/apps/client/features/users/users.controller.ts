@@ -1,24 +1,19 @@
 import {
   BoUser,
   ClientController,
-  CurrentOwner,
-  CurrentTenant,
   CurrentUser,
   JwtAuthGuard,
-  OwnerGuard,
   PaginationQueryDto,
-  TENANT_HEADER,
-  TenantApiHeader,
 } from '@lib/shared';
 import { AuthenticatedUser } from '@lib/shared/types';
 import {
   Body,
-  Delete,
   Get,
   Param,
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -31,6 +26,7 @@ import {
 } from '@nestjs/swagger';
 
 import {
+  AssignRoleDto,
   CreateUserDto,
   PaginatedUsersResponseDto,
   UpdateUserDto,
@@ -38,83 +34,136 @@ import {
 } from './dto';
 import { UsersService } from './users.service';
 
-const TENANT_HEADER_SCHEMA = {
-  name: TENANT_HEADER,
-  description:
-    'Tenant ID to filter results by. Must be a UUID of a tenant the user has access to.',
-  required: false,
-  schema: { type: 'string', format: 'uuid' },
-};
-
 @ApiTags('Users')
 @ClientController('users')
 @ApiBearerAuth('access-token')
+@UseGuards(JwtAuthGuard)
+/**
+ * Users Controller
+ *
+ * API Design Notes:
+ * - DELETE /users/:id was intentionally removed in this refactor
+ * - User deletion should be handled via soft-delete (setting isActive=false)
+ * - If hard delete is needed, it should cascade through:
+ *   1. Remove user roles from all tenant schemas (ClUserRole)
+ *   2. Remove user-tenant assignments (BoUserTenant)
+ *   3. Delete/deactivate user record (BoUser)
+ * - This is a breaking change from the previous API
+ */
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  /**
+   * Task 1: POST /users
+   * Create a new user without assigning any role or tenant
+   */
   @Post()
-  @UseGuards(JwtAuthGuard, OwnerGuard)
-  @ApiOperation({ summary: 'Create a new tenant user (Owner only)' })
-  @ApiCreatedResponse({ type: UserWithTenantsResponseDto })
+  @ApiOperation({
+    summary: 'Create a new user',
+    description:
+      'Creates a user in the same tenant group. Does not assign any tenant or role.',
+  })
+  @ApiCreatedResponse({ type: BoUser })
   async create(
     @Body() createUserDto: CreateUserDto,
-    @CurrentOwner() owner: BoUser,
-  ) {
-    return this.usersService.create(createUserDto, owner);
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<BoUser> {
+    return this.usersService.create(createUserDto, user.userId);
   }
 
+  /**
+   * Task 2: GET /users
+   * Get all users in the same tenant group (not filtered by selected tenant)
+   */
   @Get()
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Get all users with pagination' })
-  @TenantApiHeader()
+  @ApiOperation({
+    summary: 'Get all users',
+    description:
+      'Returns all users in the same tenant group with pagination. Not filtered by selected tenant.',
+  })
   @ApiOkResponse({ type: PaginatedUsersResponseDto })
   async findAll(
     @Query() query: PaginationQueryDto,
     @CurrentUser() user: AuthenticatedUser,
-    @CurrentTenant(false) tenantId?: string,
-  ) {
-    return this.usersService.findAllForUser(query, user.userId, tenantId);
+  ): Promise<PaginatedUsersResponseDto> {
+    return this.usersService.findAll(query, user.userId);
   }
 
+  /**
+   * Task 4: GET /users/:id
+   * Get a specific user with their tenants and roles
+   */
   @Get(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Get a specific user by ID' })
-  @TenantApiHeader()
+  @ApiOperation({
+    summary: 'Get a user by ID',
+    description:
+      'Returns user information with their tenant and role assignments. Not filtered by selected tenant.',
+  })
   @ApiOkResponse({ type: UserWithTenantsResponseDto })
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
-    @CurrentTenant(false) tenantId?: string,
-  ) {
-    return this.usersService.findOneForUser(id, user.userId, tenantId);
+  ): Promise<UserWithTenantsResponseDto> {
+    return this.usersService.findOne(id, user.userId);
   }
 
+  /**
+   * Task 3: PATCH /users/:id
+   * Update user information only (firstName, lastName)
+   */
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Update a user' })
-  @TenantApiHeader()
-  @ApiOkResponse({ type: UserWithTenantsResponseDto })
+  @ApiOperation({
+    summary: 'Update a user',
+    description:
+      'Updates user information (firstName, lastName). Does not modify tenant or role assignments.',
+  })
+  @ApiOkResponse({ type: BoUser })
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateUserDto: UpdateUserDto,
     @CurrentUser() user: AuthenticatedUser,
-    @CurrentTenant(false) tenantId?: string,
-  ) {
-    return this.usersService.updateForUser(
-      id,
-      updateUserDto,
-      user.userId,
-      tenantId,
-    );
+  ): Promise<BoUser> {
+    return this.usersService.update(id, updateUserDto, user.userId);
   }
 
-  @Delete(':id')
-  @UseGuards(JwtAuthGuard, OwnerGuard)
-  @ApiOperation({ summary: 'Soft delete a user (Owner only)' })
-  async remove(
+  /**
+   * Task 5: PUT /users/:id/assign-roles
+   * Assign roles to a user in multiple tenants
+   */
+  @Put(':id/assign-roles')
+  @ApiOperation({
+    summary: 'Assign roles to a user',
+    description:
+      'Assigns roles to a user in specified tenants. Creates tenant assignment if not exists.',
+  })
+  @ApiOkResponse({
+    description: 'Role assignments processed successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          example: 'Role assignments processed successfully',
+        },
+        assignments: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              tenantId: { type: 'string', format: 'uuid' },
+              roleId: { type: 'string', format: 'uuid' },
+              success: { type: 'boolean' },
+            },
+          },
+        },
+      },
+    },
+  })
+  async assignRoles(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentOwner() owner: BoUser,
+    @Body() assignRoleDto: AssignRoleDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.usersService.remove(id, owner);
+    return this.usersService.assignRoles(id, assignRoleDto, user.userId);
   }
 }
