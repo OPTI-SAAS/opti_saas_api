@@ -3,10 +3,17 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 
 import { AuthModule } from './features/auth/auth.module';
 import { UsersModule } from './features/users/users.module';
+import { WarehousesModule } from './features/warehouses';
 import { DatabaseModule } from './modules/database';
 
 @Module({
-  imports: [TenancyModule, DatabaseModule, AuthModule, UsersModule],
+  imports: [
+    TenancyModule,
+    DatabaseModule,
+    AuthModule,
+    UsersModule,
+    WarehousesModule,
+  ],
 })
 export class ClientModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
