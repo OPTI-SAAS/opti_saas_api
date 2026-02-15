@@ -7,12 +7,7 @@ import { WarehousesController } from './warehouses.controller';
 import { WarehousesService } from './warehouses.service';
 
 @Module({
-  imports: [
-    ConfigModule,
-    BoDatabaseModule,
-    PassportModule.register({ defaultStrategy: 'jwt' }),
-    SharedJwtModule,
-  ],
+  imports: [ConfigModule, BoDatabaseModule, PassportModule, SharedJwtModule],
   controllers: [WarehousesController],
   providers: [WarehousesService],
   exports: [WarehousesService],
