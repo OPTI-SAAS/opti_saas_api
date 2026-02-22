@@ -219,6 +219,8 @@ export class AuthService {
       );
       return roles;
     } catch (error) {
+      console.log('---error:', error);
+
       throw new InternalServerErrorException(error, {
         description: 'Error fetching tenant roles ',
       });

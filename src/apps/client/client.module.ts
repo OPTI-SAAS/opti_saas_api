@@ -2,6 +2,7 @@ import { TenancyModule, TenantContextMiddleware } from '@lib/shared';
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 
 import { AuthModule } from './features/auth/auth.module';
+import { FilesModule } from './features/files';
 import { UsersModule } from './features/users/users.module';
 import { WarehousesModule } from './features/warehouses';
 import { DatabaseModule } from './modules/database';
@@ -13,6 +14,7 @@ import { DatabaseModule } from './modules/database';
     AuthModule,
     UsersModule,
     WarehousesModule,
+    FilesModule,
   ],
 })
 export class ClientModule implements NestModule {

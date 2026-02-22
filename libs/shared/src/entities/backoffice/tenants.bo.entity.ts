@@ -1,5 +1,8 @@
 import { BaseEntity } from '@lib/shared/base';
-import { generateTenantSchemaName } from '@lib/shared/helpers';
+import {
+  generateTenantBucketName,
+  generateTenantSchemaName,
+} from '@lib/shared/helpers';
 import { Exclude } from 'class-transformer';
 import {
   BeforeInsert,
@@ -31,6 +34,16 @@ export class BoTenant extends BaseEntity {
   @Exclude()
   dbSchema!: string;
 
+  // FIXME: after going to prod and running the migration, and we insure that all tenants have a bucket name
+  // we should make this column non-nullable and unique
+  @Column({
+    name: 'bucket_name',
+    type: 'varchar',
+    nullable: true,
+  })
+  @Exclude()
+  bucketName?: string;
+
   @Column({ name: 'name', type: 'varchar', unique: true })
   name!: string;
 
@@ -38,6 +51,13 @@ export class BoTenant extends BaseEntity {
   setDbSchemaOnInsert() {
     if (!this.dbSchema) {
       this.dbSchema = generateTenantSchemaName(this.name);
+    }
+  }
+
+  @BeforeInsert()
+  setBucketNameOnInsert() {
+    if (!this.bucketName) {
+      this.bucketName = generateTenantBucketName(this.name);
     }
   }
 }

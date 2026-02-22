@@ -1,6 +1,7 @@
 import {
   BACKOFFICE_CONNECTION,
   BoTenant,
+  getBoSourceOptions,
   getClientSourceOptions,
 } from '@lib/shared';
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
@@ -15,9 +16,55 @@ export class DatabaseService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    this.logger.log('Starting backoffice migrations on app startup...');
+    await this.runBackofficeMigrations();
+    this.logger.log('Backoffice migrations completed successfully');
+
     this.logger.log('Starting tenant migrations on app startup...');
     await this.runMigrationsForAllTenants();
     this.logger.log('Tenant migrations completed successfully');
+  }
+
+  /**
+   * Run migrations for backoffice schema
+   */
+  private async runBackofficeMigrations(): Promise<void> {
+    let backofficeDataSource: DataSource | undefined;
+
+    try {
+      backofficeDataSource = new DataSource({
+        ...getBoSourceOptions(),
+        name: 'migration-backoffice',
+        schema: 'backoffice',
+        logging: false,
+      });
+
+      await backofficeDataSource.initialize();
+      this.logger.debug('  - DataSource initialized for backoffice');
+
+      const migrations = await backofficeDataSource.runMigrations({
+        transaction: 'all',
+      });
+
+      if (migrations.length > 0) {
+        this.logger.debug(
+          `  - Executed ${migrations.length} migration(s) for backoffice`,
+        );
+        migrations.forEach((migration) => {
+          this.logger.debug(`    • ${migration.name}`);
+        });
+      } else {
+        this.logger.debug('  - No pending migrations for backoffice');
+      }
+    } catch (error) {
+      this.logger.error('Error running backoffice migrations', error);
+      throw error;
+    } finally {
+      if (backofficeDataSource?.isInitialized) {
+        await backofficeDataSource.destroy();
+        this.logger.debug('  - DataSource destroyed for backoffice');
+      }
+    }
   }
 
   /**
@@ -27,7 +74,7 @@ export class DatabaseService implements OnModuleInit {
     try {
       const tenantRepository = this.boDataSource.getRepository(BoTenant);
       const tenants = await tenantRepository.find();
-      this.logger.log(`Found ${tenants.length} tenants`);
+      this.logger.debug(`Found ${tenants.length} tenants`);
       return tenants;
     } catch (error) {
       this.logger.error('Error fetching tenants from backoffice DB', error);
@@ -45,12 +92,12 @@ export class DatabaseService implements OnModuleInit {
 
     for (const tenant of tenants) {
       try {
-        this.logger.log(
+        this.logger.debug(
           `Running migrations for tenant: ${tenant.name} (schema: ${tenant.dbSchema})`,
         );
         await this.runMigrationForTenant(tenant.dbSchema);
         successfulMigrations.push(tenant.name);
-        this.logger.log(`✓ Migrations completed for tenant: ${tenant.name}`);
+        this.logger.debug(`✓ Migrations completed for tenant: ${tenant.name}`);
       } catch (error) {
         this.logger.error(
           `✗ Migration failed for tenant: ${tenant.name}`,
@@ -61,17 +108,17 @@ export class DatabaseService implements OnModuleInit {
     }
 
     // Log summary
-    this.logger.log('='.repeat(60));
-    this.logger.log('Migration Summary:');
-    this.logger.log(`  Successful: ${successfulMigrations.length} tenants`);
+    this.logger.debug('='.repeat(60));
+    this.logger.debug('Migration Summary:');
+    this.logger.debug(`  Successful: ${successfulMigrations.length} tenants`);
     if (successfulMigrations.length > 0) {
-      this.logger.log(`    - ${successfulMigrations.join(', ')}`);
+      this.logger.debug(`    - ${successfulMigrations.join(', ')}`);
     }
-    this.logger.log(`  Failed: ${failedMigrations.length} tenants`);
+    this.logger.debug(`  Failed: ${failedMigrations.length} tenants`);
     if (failedMigrations.length > 0) {
       this.logger.error(`    - ${failedMigrations.join(', ')}`);
     }
-    this.logger.log('='.repeat(60));
+    this.logger.debug('='.repeat(60));
 
     if (failedMigrations.length > 0) {
       throw new Error(

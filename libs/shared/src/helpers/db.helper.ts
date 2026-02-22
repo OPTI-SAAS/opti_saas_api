@@ -86,6 +86,30 @@ export function generateTenantSchemaName(tenantName: string): string {
   const suffix = `_${ts}`;
 
   base = base.substring(0, 63 - suffix.length);
+  const prefix = 'Tn_';
+  return `${prefix}${base}${suffix}`;
+}
 
-  return `${base}${suffix}`;
+export function generateTenantBucketName(tenantName: string): string {
+  let base = tenantName
+    .trim()
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  base = base
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replaceAll(/-+/g, '-')
+    .replaceAll(/(^-+)|(-+$)/g, '');
+
+  if (!/^[a-z0-9]/.test(base)) {
+    base = `tenant-${base}`;
+  }
+
+  const ts = Date.now().toString();
+  const suffix = `-${ts}`;
+
+  base = base.substring(0, 63 - suffix.length).replaceAll(/-+$/g, '');
+  const prefix = 'tn-';
+  return `${prefix}${base}${suffix}`;
 }
