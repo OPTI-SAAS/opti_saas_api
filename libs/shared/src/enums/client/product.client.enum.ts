@@ -5,13 +5,17 @@ export const PRODUCT_TYPES = {
   LENS: 'lens',
   CONTACT_LENS: 'contact_lens',
   ACCESSORY: 'accessory',
-};
+} as const;
+
+export const ProductValues = Object.values(PRODUCT_TYPES);
 
 export const PRODUCT_STATUS = {
-  ACTIVE: 'active',
-  INACTIVE: 'inactive',
+  AVAILABLE: 'available',
+  RESERVED: 'reserved',
+  ON_ORDER: 'on_order',
+  IN_TRANSIT: 'in_transit',
   OUT_OF_STOCK: 'out_of_stock',
-  DISCONTINUED: 'discontinued',
+  OBSOLETE: 'obsolete',
 } as const;
 
 export type ProductType = ExtractEnumTypes<typeof PRODUCT_TYPES>;
