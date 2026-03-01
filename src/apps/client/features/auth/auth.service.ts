@@ -132,6 +132,7 @@ export class AuthService {
         refreshToken: newRefreshToken,
       };
     } catch (error) {
+      console.log('---error:', error);
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
