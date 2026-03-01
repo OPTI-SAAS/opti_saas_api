@@ -8,6 +8,7 @@ import {
   BoUserTenant,
   ClRole,
   ClUserRole,
+  FileStorageService,
   getTenantConnection,
 } from '@lib/shared';
 import { ConflictException, Inject, Injectable } from '@nestjs/common';
@@ -19,6 +20,7 @@ import { CreateTenantWithOwnerDto } from './dto/create-tenant-with-owner.dto';
 export class TenantsService {
   constructor(
     @Inject(BACKOFFICE_CONNECTION) private readonly dataSource: DataSource,
+    private readonly fileStorageService: FileStorageService,
   ) {}
 
   async createTenantWithOwner(
@@ -96,6 +98,9 @@ export class TenantsService {
   }
 
   async setupTenant(tenant: BoTenant, adminUser: BoUser) {
+    // Create storage bucket for tenant
+    await this.fileStorageService.createBucket(tenant.bucketName!);
+
     const tenantDataSource = await this.getTenantSchemaDataSource(tenant);
     const clAdminUser = await tenantDataSource.transaction(async (manager) => {
       const clAdminRole = await this.setupTenantRoles(manager);

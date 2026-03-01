@@ -55,7 +55,7 @@ export class TenantDataSourceManager implements OnModuleInit {
       });
     }
 
-    return this.sanitizeSchema(tenant.dbSchema);
+    return tenant.dbSchema;
   }
 
   /**
