@@ -4,8 +4,9 @@ import {
   ProductPricingMode,
   ProductType,
 } from '@lib/shared/enums';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
 
+import { ClFile } from './files.client.entity';
 import { ClVat } from './vats.client.entity';
 
 @Entity('products')
@@ -35,8 +36,12 @@ export class ClProduct extends BaseEntity {
   @Column({ name: 'color', type: 'varchar', nullable: true })
   color?: string;
 
-  @Column({ name: 'external_referance', type: 'varchar' })
+  @Column({ name: 'external_referance', type: 'varchar', nullable: true })
   externalReferance?: string;
+
+  @OneToOne(() => ClFile, { nullable: true })
+  @JoinColumn({ name: 'main_picture_id' })
+  mainPicture?: ClFile;
 
   // * Pricing columns *
 
