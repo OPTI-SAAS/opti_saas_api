@@ -1,25 +1,25 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 import {
   PRODUCT_PRICING_MODES,
-  PRODUCT_STATUS,
   PRODUCT_TYPES,
+  ProductFrameGender,
+  ProductGenderValues,
   ProductPricingMode,
   ProductPricingModeValues,
-  ProductStatus,
+  ProductType,
+  ProductTypeValues,
 } from '@lib/shared/enums/client/product.client.enum';
 import {
   getPricingModeParametersErrorMessage,
   validatePricingModeParameters,
 } from '@lib/shared/helpers';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import {
   IsArray,
+  IsDefined,
   IsEnum,
   IsNumber,
   IsOptional,
   IsString,
-  IsUUID,
-  Min,
   Validate,
   ValidateIf,
   ValidationArguments,
@@ -59,6 +59,12 @@ class PricingModeParametersUpdateConstraint implements ValidatorConstraintInterf
 }
 
 export class UpdateProductBaseDto {
+  @ApiProperty({ enum: ProductTypeValues })
+  @IsEnum(ProductTypeValues)
+  @IsString()
+  @IsDefined()
+  productType!: ProductType;
+
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
@@ -67,22 +73,23 @@ export class UpdateProductBaseDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
-  barcode?: string;
+  designation?: string;
 
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
-  designation?: string;
+  brand?: string;
 
   @ApiPropertyOptional()
-  @IsUUID('4')
+  @IsString()
   @IsOptional()
-  brandId?: string;
+  model?: string;
 
-  @ApiPropertyOptional()
-  @IsUUID('4')
+  @ApiPropertyOptional({ type: String, isArray: true })
+  @IsArray()
+  @IsString({ each: true })
   @IsOptional()
-  modelId?: string;
+  family?: string[];
 
   @ApiPropertyOptional()
   @IsString()
@@ -92,29 +99,7 @@ export class UpdateProductBaseDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
-  supplierReference?: string;
-
-  @ApiPropertyOptional()
-  @IsUUID('4')
-  @IsOptional()
-  familyId?: string;
-
-  @ApiPropertyOptional()
-  @IsUUID('4')
-  @IsOptional()
-  subFamilyId?: string;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
-  alertThreshold?: number;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
-  purchasePriceHT?: number;
+  externalReferance?: string;
 
   @ApiPropertyOptional({ enum: ProductPricingModeValues })
   @IsString()
@@ -127,7 +112,6 @@ export class UpdateProductBaseDto {
     (object) => object.pricingMode === PRODUCT_PRICING_MODES.COEFFICIENT,
   )
   @IsNumber()
-  @Min(0)
   @IsOptional()
   coefficient?: number;
 
@@ -136,7 +120,6 @@ export class UpdateProductBaseDto {
     (object) => object.pricingMode === PRODUCT_PRICING_MODES.FIXED_PRICE,
   )
   @IsNumber()
-  @Min(0)
   @IsOptional()
   fixedPrice?: number;
 
@@ -145,50 +128,52 @@ export class UpdateProductBaseDto {
     (object) => object.pricingMode === PRODUCT_PRICING_MODES.FIXED_ADDED_AMOUNT,
   )
   @IsNumber()
-  @Min(0)
   @IsOptional()
   fixedAddedAmount?: number;
 
   @ApiPropertyOptional()
-  @IsUUID('4')
+  @IsString()
   @IsOptional()
   vatId?: string;
 
-  @ApiPropertyOptional({ enum: Object.values(PRODUCT_STATUS) })
-  @IsEnum(Object.values(PRODUCT_STATUS))
-  @IsOptional()
-  status?: ProductStatus;
-
   @ApiPropertyOptional()
-  @IsUUID('4')
+  @IsNumber()
   @IsOptional()
-  productPhotoId?: string;
+  minimumStockAlert?: number;
 }
 
-export class UpdateFrameProductDto extends UpdateProductBaseDto {
-  @ApiPropertyOptional({ enum: [PRODUCT_TYPES.FRAME] })
-  @IsOptional()
-  productType?: 'frame';
+export class UpdateFrameProductDto extends OmitType(UpdateProductBaseDto, [
+  'brand',
+  'model',
+] as const) {
+  @ApiProperty({ enum: [PRODUCT_TYPES.FRAME] })
+  @IsDefined()
+  productType!: typeof PRODUCT_TYPES.FRAME;
 
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
-  frameCategory?: string;
+  brand?: string;
 
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
-  framegender?: string;
+  model?: string;
+
+  @ApiPropertyOptional({ enum: ProductGenderValues })
+  @IsString()
+  @IsOptional()
+  frameGender?: ProductFrameGender;
 
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
-  frameshape?: string;
+  frameShape?: string;
 
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
-  framematerial?: string;
+  frameMaterial?: string;
 
   @ApiPropertyOptional()
   @IsString()
@@ -218,18 +203,13 @@ export class UpdateFrameProductDto extends UpdateProductBaseDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
-  frameColor?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  frameTempleColor?: string;
+  frameFinish?: string;
 }
 
 export class UpdateLensProductDto extends UpdateProductBaseDto {
-  @ApiPropertyOptional({ enum: [PRODUCT_TYPES.LENS] })
-  @IsOptional()
-  productType?: 'lens';
+  @ApiProperty({ enum: [PRODUCT_TYPES.LENS] })
+  @IsDefined()
+  productType!: typeof PRODUCT_TYPES.LENS;
 
   @ApiPropertyOptional()
   @IsString()
@@ -239,7 +219,7 @@ export class UpdateLensProductDto extends UpdateProductBaseDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
-  framematerial?: string;
+  lensMaterial?: string;
 
   @ApiPropertyOptional()
   @IsString()
@@ -251,63 +231,22 @@ export class UpdateLensProductDto extends UpdateProductBaseDto {
   @IsOptional()
   lensTint?: string;
 
-  @ApiPropertyOptional({ type: [String] })
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  lensFilters?: string[];
-
-  @ApiPropertyOptional({ type: [String] })
+  @ApiPropertyOptional({ type: String, isArray: true })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   lensTreatments?: string[];
 
   @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  lensSpherePower?: number;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  lensCylinderPower?: number;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  lensAxis?: number;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  lensAddition?: number;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  lensDiameter?: number;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  lensBaseCurve?: number;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  lensCurvature?: number;
-
-  @ApiPropertyOptional()
   @IsString()
   @IsOptional()
-  lensOpticalFamily?: string;
+  lensFabricant?: string;
 }
 
 export class UpdateContactLensProductDto extends UpdateProductBaseDto {
-  @ApiPropertyOptional({ enum: [PRODUCT_TYPES.CONTACT_LENS] })
-  @IsOptional()
-  productType?: 'contact_lens';
+  @ApiProperty({ enum: [PRODUCT_TYPES.CONTACT_LENS] })
+  @IsDefined()
+  productType!: typeof PRODUCT_TYPES.CONTACT_LENS;
 
   @ApiPropertyOptional()
   @IsString()
@@ -322,20 +261,59 @@ export class UpdateContactLensProductDto extends UpdateProductBaseDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
-  contactLensCommercialModel?: string;
+  contactLensFabricant?: string;
 
   @ApiPropertyOptional()
   @IsNumber()
   @IsOptional()
-  contactLensCylinder?: number;
+  contactLensBaseCurve?: number;
+
+  @ApiPropertyOptional()
+  @IsNumber()
+  @IsOptional()
+  contactLensDiameter?: number;
+
+  @ApiPropertyOptional()
+  @IsNumber()
+  @IsOptional()
+  contactLensQuantityPerBox?: number;
+}
+
+export class UpdateCliponProductDto extends UpdateProductBaseDto {
+  @ApiProperty({ enum: [PRODUCT_TYPES.CLIPON] })
+  @IsDefined()
+  productType!: typeof PRODUCT_TYPES.CLIPON;
 
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
-  contactLensBatchNumber?: string;
+  cliponType?: string;
+
+  @ApiPropertyOptional({ type: String, isArray: true })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  cliponTreatments?: string[];
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  cliponTint?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  cliponCompatibleEyeSize?: string;
+}
+
+export class UpdateAccessoryProductDto extends UpdateProductBaseDto {
+  @ApiProperty({ enum: [PRODUCT_TYPES.ACCESSORY] })
+  @IsDefined()
+  productType!: typeof PRODUCT_TYPES.ACCESSORY;
 }
 
 export type UpdateProductDto =
   | UpdateFrameProductDto
   | UpdateLensProductDto
-  | UpdateContactLensProductDto;
+  | UpdateContactLensProductDto
+  | UpdateCliponProductDto;

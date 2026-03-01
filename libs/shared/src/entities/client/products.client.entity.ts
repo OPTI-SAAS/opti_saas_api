@@ -4,9 +4,17 @@ import {
   ProductPricingMode,
   ProductType,
 } from '@lib/shared/enums';
-import { Column, Entity, JoinColumn, ManyToOne, OneToOne } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  OneToMany,
+  OneToOne,
+} from 'typeorm';
 
 import { ClFile } from './files.client.entity';
+import { ClProductSupplier } from './product-suppliers.client.entity';
 import { ClVat } from './vats.client.entity';
 
 @Entity('products')
@@ -75,6 +83,12 @@ export class ClProduct extends BaseEntity {
   @ManyToOne(() => ClVat, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'vat_id' })
   vat?: ClVat;
+
+  @OneToMany(
+    () => ClProductSupplier,
+    (productSupplier) => productSupplier.product,
+  )
+  productSuppliers?: ClProductSupplier[];
 
   @Column({ name: 'stock_quantity', type: 'int', nullable: true })
   minimumStockAlert?: number;

@@ -1,37 +1,41 @@
-import { PRODUCT_TYPES } from '@lib/shared/enums/client/product.client.enum';
+import {
+  PRODUCT_TYPES,
+  ProductType,
+} from '@lib/shared/enums/client/product.client.enum';
 import { BadRequestException, Injectable, PipeTransform } from '@nestjs/common';
 import { ClassConstructor, plainToInstance } from 'class-transformer';
 import { validateSync, ValidationError } from 'class-validator';
 
 import {
+  UpdateAccessoryProductDto,
+  UpdateCliponProductDto,
   UpdateContactLensProductDto,
   UpdateFrameProductDto,
   UpdateLensProductDto,
   UpdateProductBaseDto,
 } from '../dto/update-products.dto';
 
-type UpdateProductTypeKey =
-  | typeof PRODUCT_TYPES.FRAME
-  | typeof PRODUCT_TYPES.LENS
-  | typeof PRODUCT_TYPES.CONTACT_LENS;
-
 type UpdateProductDtoConstructor = ClassConstructor<object>;
+
+const UPDATE_PRODUCT_DTO_MAP = {
+  [PRODUCT_TYPES.FRAME]: UpdateFrameProductDto,
+  [PRODUCT_TYPES.LENS]: UpdateLensProductDto,
+  [PRODUCT_TYPES.CONTACT_LENS]: UpdateContactLensProductDto,
+  [PRODUCT_TYPES.CLIPON]: UpdateCliponProductDto,
+  [PRODUCT_TYPES.ACCESSORY]: UpdateAccessoryProductDto,
+} satisfies Record<ProductType, UpdateProductDtoConstructor>;
+
+type UpdateProductTypeKey = keyof typeof UPDATE_PRODUCT_DTO_MAP;
 
 @Injectable()
 export class UpdateProductValidationPipe implements PipeTransform {
-  private readonly dtoMap: Record<
-    UpdateProductTypeKey,
-    UpdateProductDtoConstructor
-  > = {
-    [PRODUCT_TYPES.FRAME]: UpdateFrameProductDto,
-    [PRODUCT_TYPES.LENS]: UpdateLensProductDto,
-    [PRODUCT_TYPES.CONTACT_LENS]: UpdateContactLensProductDto,
-  };
+  private readonly dtoMap = UPDATE_PRODUCT_DTO_MAP;
 
   private readonly fallbackDtos: UpdateProductDtoConstructor[] = [
     UpdateFrameProductDto,
     UpdateLensProductDto,
     UpdateContactLensProductDto,
+    UpdateCliponProductDto,
     UpdateProductBaseDto,
   ];
 
@@ -55,11 +59,7 @@ export class UpdateProductValidationPipe implements PipeTransform {
   private isUpdateProductTypeKey(
     value: string | undefined,
   ): value is UpdateProductTypeKey {
-    return (
-      value === PRODUCT_TYPES.FRAME ||
-      value === PRODUCT_TYPES.LENS ||
-      value === PRODUCT_TYPES.CONTACT_LENS
-    );
+    return !!value && value in this.dtoMap;
   }
 
   private validateWith(DtoClass: UpdateProductDtoConstructor, value: unknown) {

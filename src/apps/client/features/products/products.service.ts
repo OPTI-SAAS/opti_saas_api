@@ -46,7 +46,12 @@ export class ProductsService {
     return this.tenantRepoFactory.executeInTransaction(async (manager) => {
       const productRepo = manager.getRepository(ClProduct);
       return await productRepo.find({
-        relations: ['vat', 'productPhoto'],
+        relations: [
+          'vat',
+          'productPhoto',
+          'productSuppliers',
+          'productSuppliers.supplier',
+        ],
         order: { createdAt: 'DESC' },
       });
     });
@@ -57,7 +62,12 @@ export class ProductsService {
       const productRepo = manager.getRepository(ClProduct);
       const product = await productRepo.findOne({
         where: { id },
-        relations: ['vat', 'productPhoto'],
+        relations: [
+          'vat',
+          'productPhoto',
+          'productSuppliers',
+          'productSuppliers.supplier',
+        ],
       });
 
       if (!product) {

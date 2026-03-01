@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 import {
   PRODUCT_PRICING_MODES,
   PRODUCT_TYPES,
@@ -7,6 +6,7 @@ import {
   ProductPricingMode,
   ProductPricingModeValues,
   ProductType,
+  ProductTypeValues,
 } from '@lib/shared/enums/client/product.client.enum';
 import {
   getPricingModeParametersErrorMessage,
@@ -16,6 +16,7 @@ import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import {
   IsArray,
   IsDefined,
+  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
@@ -57,7 +58,8 @@ export class CreateProductBaseDto {
   @IsDefined()
   internalCode!: string;
 
-  @ApiProperty()
+  @ApiProperty({ enum: ProductTypeValues })
+  @IsEnum(ProductTypeValues)
   @IsString()
   @IsDefined()
   productType!: ProductType;
@@ -309,8 +311,16 @@ export class CreateCliponProductDto extends CreateProductBaseDto {
   cliponCompatibleEyeSize!: string;
 }
 
+export class CreateAccessoryProductDto extends CreateProductBaseDto {
+  @ApiProperty({ enum: [PRODUCT_TYPES.ACCESSORY] })
+  @IsString()
+  @IsDefined()
+  productType!: typeof PRODUCT_TYPES.ACCESSORY;
+}
+
 export type CreateProductDto =
   | CreateFrameProductDto
   | CreateLensProductDto
   | CreateContactLensProductDto
-  | CreateCliponProductDto;
+  | CreateCliponProductDto
+  | CreateAccessoryProductDto;

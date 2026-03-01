@@ -8,7 +8,7 @@ export const PRODUCT_TYPES = {
   ACCESSORY: 'accessory',
 } as const;
 
-export const ProductValues = Object.values(PRODUCT_TYPES);
+export const ProductTypeValues = Object.values(PRODUCT_TYPES);
 
 export const PRODUCT_STATUS = {
   AVAILABLE: 'available',
