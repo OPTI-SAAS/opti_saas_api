@@ -1,8 +1,16 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import {
+  PRODUCT_PRICING_MODES,
   PRODUCT_STATUS,
   PRODUCT_TYPES,
+  ProductPricingMode,
+  ProductPricingModeValues,
   ProductStatus,
 } from '@lib/shared/enums/client/product.client.enum';
+import {
+  getPricingModeParametersErrorMessage,
+  validatePricingModeParameters,
+} from '@lib/shared/helpers';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsArray,
@@ -12,7 +20,43 @@ import {
   IsString,
   IsUUID,
   Min,
+  Validate,
+  ValidateIf,
+  ValidationArguments,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
 } from 'class-validator';
+
+@ValidatorConstraint({ name: 'pricingModeParametersUpdate', async: false })
+class PricingModeParametersUpdateConstraint implements ValidatorConstraintInterface {
+  validate(_value: unknown, args: ValidationArguments): boolean {
+    const object = args.object as UpdateProductBaseDto;
+
+    return validatePricingModeParameters(
+      {
+        pricingMode: object.pricingMode,
+        coefficient: object.coefficient,
+        fixedPrice: object.fixedPrice,
+        fixedAddedAmount: object.fixedAddedAmount,
+      },
+      { allowMissingPricingMode: true },
+    );
+  }
+
+  defaultMessage(args: ValidationArguments): string {
+    const object = args.object as UpdateProductBaseDto;
+
+    return getPricingModeParametersErrorMessage(
+      {
+        pricingMode: object.pricingMode,
+        coefficient: object.coefficient,
+        fixedPrice: object.fixedPrice,
+        fixedAddedAmount: object.fixedAddedAmount,
+      },
+      { allowMissingPricingMode: true },
+    );
+  }
+}
 
 export class UpdateProductBaseDto {
   @ApiPropertyOptional()
@@ -72,11 +116,38 @@ export class UpdateProductBaseDto {
   @IsOptional()
   purchasePriceHT?: number;
 
+  @ApiPropertyOptional({ enum: ProductPricingModeValues })
+  @IsString()
+  @IsOptional()
+  @Validate(PricingModeParametersUpdateConstraint)
+  pricingMode?: ProductPricingMode;
+
   @ApiPropertyOptional()
+  @ValidateIf(
+    (object) => object.pricingMode === PRODUCT_PRICING_MODES.COEFFICIENT,
+  )
   @IsNumber()
   @Min(0)
   @IsOptional()
   coefficient?: number;
+
+  @ApiPropertyOptional()
+  @ValidateIf(
+    (object) => object.pricingMode === PRODUCT_PRICING_MODES.FIXED_PRICE,
+  )
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  fixedPrice?: number;
+
+  @ApiPropertyOptional()
+  @ValidateIf(
+    (object) => object.pricingMode === PRODUCT_PRICING_MODES.FIXED_ADDED_AMOUNT,
+  )
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  fixedAddedAmount?: number;
 
   @ApiPropertyOptional()
   @IsUUID('4')

@@ -1,19 +1,55 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
 import {
-  PRODUCT_STATUS,
+  PRODUCT_PRICING_MODES,
   PRODUCT_TYPES,
-  ProductStatus,
+  ProductFrameGender,
+  ProductGenderValues,
+  ProductPricingMode,
+  ProductPricingModeValues,
+  ProductType,
 } from '@lib/shared/enums/client/product.client.enum';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  getPricingModeParametersErrorMessage,
+  validatePricingModeParameters,
+} from '@lib/shared/helpers';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import {
   IsArray,
   IsDefined,
-  IsEnum,
   IsNumber,
   IsOptional,
   IsString,
-  IsUUID,
-  Min,
+  Validate,
+  ValidateIf,
+  ValidationArguments,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
 } from 'class-validator';
+
+@ValidatorConstraint({ name: 'pricingModeParameters', async: false })
+class PricingModeParametersConstraint implements ValidatorConstraintInterface {
+  validate(_value: unknown, args: ValidationArguments): boolean {
+    const object = args.object as CreateProductBaseDto;
+
+    return validatePricingModeParameters({
+      pricingMode: object.pricingMode,
+      coefficient: object.coefficient,
+      fixedPrice: object.fixedPrice,
+      fixedAddedAmount: object.fixedAddedAmount,
+    });
+  }
+
+  defaultMessage(args: ValidationArguments): string {
+    const object = args.object as CreateProductBaseDto;
+
+    return getPricingModeParametersErrorMessage({
+      pricingMode: object.pricingMode,
+      coefficient: object.coefficient,
+      fixedPrice: object.fixedPrice,
+      fixedAddedAmount: object.fixedAddedAmount,
+    });
+  }
+}
 
 export class CreateProductBaseDto {
   @ApiProperty()
@@ -21,25 +57,31 @@ export class CreateProductBaseDto {
   @IsDefined()
   internalCode!: string;
 
-  @ApiPropertyOptional()
+  @ApiProperty()
   @IsString()
-  @IsOptional()
-  barcode?: string;
+  @IsDefined()
+  productType!: ProductType;
 
   @ApiProperty()
   @IsString()
   @IsDefined()
   designation!: string;
 
-  @ApiPropertyOptional()
-  @IsUUID('4')
-  @IsOptional()
-  brandId?: string;
+  @ApiProperty()
+  @IsString()
+  @IsDefined()
+  brand!: string;
 
-  @ApiPropertyOptional()
-  @IsUUID('4')
+  @ApiProperty()
+  @IsString()
+  @IsDefined()
+  model!: string;
+
+  @ApiPropertyOptional({ type: String, isArray: true })
+  @IsArray()
+  @IsString({ each: true })
   @IsOptional()
-  modelId?: string;
+  family?: string[];
 
   @ApiPropertyOptional()
   @IsString()
@@ -49,112 +91,119 @@ export class CreateProductBaseDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
-  supplierReference?: string;
+  externalReferance?: string;
 
-  @ApiPropertyOptional()
-  @IsUUID('4')
-  @IsOptional()
-  familyId?: string;
+  // * Pricing columns *
 
-  @ApiPropertyOptional()
-  @IsUUID('4')
-  @IsOptional()
-  subFamilyId?: string;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @Min(0)
-  @IsOptional()
-  alertThreshold?: number;
-
-  @ApiProperty()
-  @IsNumber()
-  @Min(0)
+  @ApiProperty({ enum: ProductPricingModeValues })
+  @IsString()
   @IsDefined()
-  purchasePriceHT!: number;
+  @Validate(PricingModeParametersConstraint)
+  pricingMode!: ProductPricingMode;
 
   @ApiPropertyOptional()
+  @ValidateIf(
+    (object) => object.pricingMode === PRODUCT_PRICING_MODES.COEFFICIENT,
+  )
   @IsNumber()
-  @Min(0)
-  @IsOptional()
-  coefficient?: number;
+  @IsDefined()
+  coefficient?: number; // Used if pricingMode = 'coefficient'
 
   @ApiPropertyOptional()
-  @IsUUID('4')
+  @ValidateIf(
+    (object) => object.pricingMode === PRODUCT_PRICING_MODES.FIXED_PRICE,
+  )
+  @IsNumber()
+  @IsDefined()
+  fixedPrice?: number; // Used if pricingMode = 'fixed-price'
+
+  @ApiPropertyOptional()
+  @ValidateIf(
+    (object) => object.pricingMode === PRODUCT_PRICING_MODES.FIXED_ADDED_AMOUNT,
+  )
+  @IsNumber()
+  @IsDefined()
+  fixedAddedAmount?: number; // Used if pricingMode = 'fixed-added-amount'
+
+  @ApiPropertyOptional()
+  @IsString()
   @IsOptional()
   vatId?: string;
 
-  @ApiProperty({ enum: Object.values(PRODUCT_STATUS) })
-  @IsEnum(Object.values(PRODUCT_STATUS))
-  @IsDefined()
-  status!: ProductStatus;
-
   @ApiPropertyOptional()
-  @IsUUID('4')
+  @IsNumber()
   @IsOptional()
-  productPhotoId?: string;
+  minimumStockAlert?: number;
 }
 
-export class CreateFrameProductDto extends CreateProductBaseDto {
+export class CreateFrameProductDto extends OmitType(CreateProductBaseDto, [
+  'brand',
+  'model',
+] as const) {
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  brand?: string;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  model?: string;
+
   @ApiProperty({ enum: [PRODUCT_TYPES.FRAME] })
   @IsString()
   @IsDefined()
   productType!: typeof PRODUCT_TYPES.FRAME;
 
-  @ApiProperty()
+  @ApiProperty({ enum: ProductGenderValues })
   @IsString()
   @IsDefined()
-  frameCategory!: string;
+  frameGender!: ProductFrameGender;
 
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
-  framegender?: string;
+  frameShape!: string;
 
-  @ApiProperty()
+  @ApiPropertyOptional()
   @IsString()
-  @IsDefined()
-  frameshape!: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsDefined()
-  framematerial!: string;
+  @IsOptional()
+  frameMaterial!: string;
 
   @ApiProperty()
   @IsString()
   @IsDefined()
   frameType!: string;
 
-  @ApiPropertyOptional()
+  // charniere
+  @ApiProperty()
   @IsString()
-  @IsOptional()
-  frameHingeType?: string;
+  @IsDefined()
+  frameHingeType!: string;
 
+  // Calibre
   @ApiProperty()
   @IsNumber()
   @IsDefined()
   frameEyeSize!: number;
 
+  // pont
   @ApiProperty()
   @IsNumber()
   @IsDefined()
   frameBridge!: number;
 
+  // branche
   @ApiProperty()
   @IsNumber()
   @IsDefined()
   frameTemple!: number;
 
-  @ApiPropertyOptional()
+  // Finition
+  @ApiProperty()
   @IsString()
-  @IsOptional()
-  frameColor?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  frameTempleColor?: string;
+  @IsDefined()
+  frameFinish!: string;
 }
 
 export class CreateLensProductDto extends CreateProductBaseDto {
@@ -171,69 +220,28 @@ export class CreateLensProductDto extends CreateProductBaseDto {
   @ApiProperty()
   @IsString()
   @IsDefined()
-  framematerial!: string;
+  lensMaterial!: string;
 
-  @ApiPropertyOptional()
+  @ApiProperty()
   @IsString()
-  @IsOptional()
-  lensRefractiveIndex?: string;
+  @IsDefined()
+  lensRefractiveIndex!: string;
 
-  @ApiPropertyOptional()
+  @ApiProperty()
   @IsString()
-  @IsOptional()
-  lensTint?: string;
+  @IsDefined()
+  lensTint!: string;
 
-  @ApiPropertyOptional({ type: [String] })
+  @ApiProperty({ type: String, isArray: true })
   @IsArray()
   @IsString({ each: true })
-  @IsOptional()
-  lensFilters?: string[];
+  @IsDefined()
+  lensTreatments!: string[];
 
-  @ApiPropertyOptional({ type: [String] })
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  lensTreatments?: string[];
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  lensSpherePower?: number;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  lensCylinderPower?: number;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  lensAxis?: number;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  lensAddition?: number;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  lensDiameter?: number;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  lensBaseCurve?: number;
-
-  @ApiPropertyOptional()
-  @IsNumber()
-  @IsOptional()
-  lensCurvature?: number;
-
-  @ApiPropertyOptional()
+  @ApiProperty()
   @IsString()
-  @IsOptional()
-  lensOpticalFamily?: string;
+  @IsDefined()
+  lensFabricant!: string;
 }
 
 export class CreateContactLensProductDto extends CreateProductBaseDto {
@@ -252,23 +260,57 @@ export class CreateContactLensProductDto extends CreateProductBaseDto {
   @IsDefined()
   contactLensUsage!: string;
 
-  @ApiPropertyOptional()
+  @ApiProperty()
   @IsString()
-  @IsOptional()
-  contactLensCommercialModel?: string;
+  @IsDefined()
+  contactLensFabricant!: string;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsDefined()
+  contactLensBaseCurve!: number;
+
+  @ApiProperty()
+  @IsNumber()
+  @IsDefined()
+  contactLensDiameter!: number;
 
   @ApiPropertyOptional()
   @IsNumber()
   @IsOptional()
-  contactLensCylinder?: number;
+  contactLensQuantityPerBox!: number;
+}
 
-  @ApiPropertyOptional()
+export class CreateCliponProductDto extends CreateProductBaseDto {
+  @ApiProperty({ enum: [PRODUCT_TYPES.CLIPON] })
   @IsString()
-  @IsOptional()
-  contactLensBatchNumber?: string;
+  @IsDefined()
+  productType!: typeof PRODUCT_TYPES.CLIPON;
+
+  @ApiProperty()
+  @IsString()
+  @IsDefined()
+  cliponType!: string;
+
+  @ApiProperty({ type: String, isArray: true })
+  @IsArray()
+  @IsString({ each: true })
+  @IsDefined()
+  cliponTreatments!: string[];
+
+  @ApiProperty()
+  @IsString()
+  @IsDefined()
+  cliponTint!: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsDefined()
+  cliponCompatibleEyeSize!: string;
 }
 
 export type CreateProductDto =
   | CreateFrameProductDto
   | CreateLensProductDto
-  | CreateContactLensProductDto;
+  | CreateContactLensProductDto
+  | CreateCliponProductDto;
