@@ -47,6 +47,9 @@ export class ClProduct extends BaseEntity {
   @Column({ name: 'external_referance', type: 'varchar', nullable: true })
   externalReferance?: string;
 
+  @Column({ name: 'main_picture_id', type: 'uuid', nullable: true })
+  mainPictureId?: string;
+
   @OneToOne(() => ClFile, { nullable: true })
   @JoinColumn({ name: 'main_picture_id' })
   mainPicture?: ClFile;

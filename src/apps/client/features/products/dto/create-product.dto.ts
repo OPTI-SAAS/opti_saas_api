@@ -53,57 +53,67 @@ class PricingModeParametersConstraint implements ValidatorConstraintInterface {
 }
 
 export class CreateProductBaseDto {
-  @ApiProperty()
+  @ApiProperty({ example: 'PRD-000123' })
   @IsString()
   @IsDefined()
   internalCode!: string;
 
-  @ApiProperty({ enum: ProductTypeValues })
+  @ApiProperty({
+    enum: ProductTypeValues,
+    example: PRODUCT_TYPES.FRAME,
+  })
   @IsEnum(ProductTypeValues)
   @IsString()
   @IsDefined()
   productType!: ProductType;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Ray-Ban Round Classic' })
   @IsString()
   @IsDefined()
   designation!: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Ray-Ban' })
   @IsString()
   @IsDefined()
   brand!: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'RB3447' })
   @IsString()
   @IsDefined()
   model!: string;
 
-  @ApiPropertyOptional({ type: String, isArray: true })
+  @ApiPropertyOptional({
+    type: String,
+    isArray: true,
+    example: ['Optical', 'Premium'],
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   family?: string[];
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'Black' })
   @IsString()
   @IsOptional()
   color?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'EXT-REF-9483' })
   @IsString()
   @IsOptional()
   externalReferance?: string;
 
   // * Pricing columns *
 
-  @ApiProperty({ enum: ProductPricingModeValues })
+  @ApiProperty({
+    enum: ProductPricingModeValues,
+    example: PRODUCT_PRICING_MODES.COEFFICIENT,
+  })
   @IsString()
   @IsDefined()
   @Validate(PricingModeParametersConstraint)
   pricingMode!: ProductPricingMode;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 1.35 })
   @ValidateIf(
     (object) => object.pricingMode === PRODUCT_PRICING_MODES.COEFFICIENT,
   )
@@ -111,7 +121,7 @@ export class CreateProductBaseDto {
   @IsDefined()
   coefficient?: number; // Used if pricingMode = 'coefficient'
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 129.99 })
   @ValidateIf(
     (object) => object.pricingMode === PRODUCT_PRICING_MODES.FIXED_PRICE,
   )
@@ -119,7 +129,7 @@ export class CreateProductBaseDto {
   @IsDefined()
   fixedPrice?: number; // Used if pricingMode = 'fixed-price'
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 25 })
   @ValidateIf(
     (object) => object.pricingMode === PRODUCT_PRICING_MODES.FIXED_ADDED_AMOUNT,
   )
@@ -127,12 +137,12 @@ export class CreateProductBaseDto {
   @IsDefined()
   fixedAddedAmount?: number; // Used if pricingMode = 'fixed-added-amount'
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '00000000-0000-0000-0000-000000000001' })
   @IsString()
   @IsOptional()
   vatId?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 10 })
   @IsNumber()
   @IsOptional()
   minimumStockAlert?: number;
@@ -142,177 +152,191 @@ export class CreateFrameProductDto extends OmitType(CreateProductBaseDto, [
   'brand',
   'model',
 ] as const) {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'Tom Ford' })
   @IsString()
   @IsOptional()
   brand?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'FT5860' })
   @IsString()
   @IsOptional()
   model?: string;
 
-  @ApiProperty({ enum: [PRODUCT_TYPES.FRAME] })
+  @ApiProperty({ enum: [PRODUCT_TYPES.FRAME], example: PRODUCT_TYPES.FRAME })
   @IsString()
   @IsDefined()
   productType!: typeof PRODUCT_TYPES.FRAME;
 
-  @ApiProperty({ enum: ProductGenderValues })
+  @ApiProperty({ enum: ProductGenderValues, example: ProductGenderValues[0] })
   @IsString()
   @IsDefined()
   frameGender!: ProductFrameGender;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'Round' })
   @IsString()
   @IsOptional()
   frameShape!: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'Acetate' })
   @IsString()
   @IsOptional()
   frameMaterial!: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Full-rim' })
   @IsString()
   @IsDefined()
   frameType!: string;
 
   // charniere
-  @ApiProperty()
+  @ApiProperty({ example: 'Spring hinge' })
   @IsString()
   @IsDefined()
   frameHingeType!: string;
 
   // Calibre
-  @ApiProperty()
+  @ApiProperty({ example: 52 })
   @IsNumber()
   @IsDefined()
   frameEyeSize!: number;
 
   // pont
-  @ApiProperty()
+  @ApiProperty({ example: 18 })
   @IsNumber()
   @IsDefined()
   frameBridge!: number;
 
   // branche
-  @ApiProperty()
+  @ApiProperty({ example: 145 })
   @IsNumber()
   @IsDefined()
   frameTemple!: number;
 
   // Finition
-  @ApiProperty()
+  @ApiProperty({ example: 'Matte' })
   @IsString()
   @IsDefined()
   frameFinish!: string;
 }
 
 export class CreateLensProductDto extends CreateProductBaseDto {
-  @ApiProperty({ enum: [PRODUCT_TYPES.LENS] })
+  @ApiProperty({ enum: [PRODUCT_TYPES.LENS], example: PRODUCT_TYPES.LENS })
   @IsString()
   @IsDefined()
   productType!: typeof PRODUCT_TYPES.LENS;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Single vision' })
   @IsString()
   @IsDefined()
   lensType!: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Polycarbonate' })
   @IsString()
   @IsDefined()
   lensMaterial!: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: '1.67' })
   @IsString()
   @IsDefined()
   lensRefractiveIndex!: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Brown' })
   @IsString()
   @IsDefined()
   lensTint!: string;
 
-  @ApiProperty({ type: String, isArray: true })
+  @ApiProperty({
+    type: String,
+    isArray: true,
+    example: ['Anti-reflective', 'UV400'],
+  })
   @IsArray()
   @IsString({ each: true })
   @IsDefined()
   lensTreatments!: string[];
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Essilor' })
   @IsString()
   @IsDefined()
   lensFabricant!: string;
 }
 
 export class CreateContactLensProductDto extends CreateProductBaseDto {
-  @ApiProperty({ enum: [PRODUCT_TYPES.CONTACT_LENS] })
+  @ApiProperty({
+    enum: [PRODUCT_TYPES.CONTACT_LENS],
+    example: PRODUCT_TYPES.CONTACT_LENS,
+  })
   @IsString()
   @IsDefined()
   productType!: typeof PRODUCT_TYPES.CONTACT_LENS;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Soft' })
   @IsString()
   @IsDefined()
   contactLensType!: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Monthly' })
   @IsString()
   @IsDefined()
   contactLensUsage!: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'CooperVision' })
   @IsString()
   @IsDefined()
   contactLensFabricant!: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 8.6 })
   @IsNumber()
   @IsDefined()
   contactLensBaseCurve!: number;
 
-  @ApiProperty()
+  @ApiProperty({ example: 14.2 })
   @IsNumber()
   @IsDefined()
   contactLensDiameter!: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 6 })
   @IsNumber()
   @IsOptional()
   contactLensQuantityPerBox!: number;
 }
 
 export class CreateCliponProductDto extends CreateProductBaseDto {
-  @ApiProperty({ enum: [PRODUCT_TYPES.CLIPON] })
+  @ApiProperty({ enum: [PRODUCT_TYPES.CLIPON], example: PRODUCT_TYPES.CLIPON })
   @IsString()
   @IsDefined()
   productType!: typeof PRODUCT_TYPES.CLIPON;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Polarized clip-on' })
   @IsString()
   @IsDefined()
   cliponType!: string;
 
-  @ApiProperty({ type: String, isArray: true })
+  @ApiProperty({
+    type: String,
+    isArray: true,
+    example: ['Anti-scratch', 'Polarized'],
+  })
   @IsArray()
   @IsString({ each: true })
   @IsDefined()
   cliponTreatments!: string[];
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Smoke' })
   @IsString()
   @IsDefined()
   cliponTint!: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: '52-18' })
   @IsString()
   @IsDefined()
   cliponCompatibleEyeSize!: string;
 }
 
 export class CreateAccessoryProductDto extends CreateProductBaseDto {
-  @ApiProperty({ enum: [PRODUCT_TYPES.ACCESSORY] })
+  @ApiProperty({
+    enum: [PRODUCT_TYPES.ACCESSORY],
+    example: PRODUCT_TYPES.ACCESSORY,
+  })
   @IsString()
   @IsDefined()
   productType!: typeof PRODUCT_TYPES.ACCESSORY;

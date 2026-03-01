@@ -1,8 +1,14 @@
 import { TenantRepositoryFactory } from '@lib/shared';
 import { ClProduct } from '@lib/shared/entities/client/products.client.entity';
+import { ClStockItem } from '@lib/shared/entities/client/stock-items.client.entity';
 import { ClVat } from '@lib/shared/entities/client/vats.client.entity';
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { EntityManager } from 'typeorm';
+import { STOCK_ITEM_STATUSES } from '@lib/shared/enums/client/stock.client.enum';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { EntityManager, In } from 'typeorm';
 
 import type { CreateProductDto } from './dto/create-product.dto';
 import type { UpdateProductDto } from './dto/update-products.dto';
@@ -48,7 +54,7 @@ export class ProductsService {
       return await productRepo.find({
         relations: [
           'vat',
-          'productPhoto',
+          'mainPicture',
           'productSuppliers',
           'productSuppliers.supplier',
         ],
@@ -102,10 +108,27 @@ export class ProductsService {
   async remove(id: string) {
     return this.tenantRepoFactory.executeInTransaction(async (manager) => {
       const productRepo = manager.getRepository(ClProduct);
+      const stockItemRepo = manager.getRepository(ClStockItem);
       const existing = await productRepo.findOne({ where: { id } });
 
       if (!existing) {
         throw new NotFoundException(`Product with id ${id} not found`);
+      }
+
+      const blockingCount = await stockItemRepo.count({
+        where: {
+          productId: id,
+          status: In([
+            STOCK_ITEM_STATUSES.ACTIVE,
+            STOCK_ITEM_STATUSES.RESERVED,
+          ]),
+        },
+      });
+
+      if (blockingCount > 0) {
+        throw new ConflictException(
+          `Product with id ${id} cannot be deleted because active or reserved stock items exist`,
+        );
       }
 
       await productRepo.softDelete(id);
