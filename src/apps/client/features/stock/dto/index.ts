@@ -1,3 +1,4 @@
+export * from './create-bulk-stock-receipt.dto';
 export * from './create-stock-entry.dto';
 export * from './move-stock-items.dto';
 export * from './query-stock-history.dto';

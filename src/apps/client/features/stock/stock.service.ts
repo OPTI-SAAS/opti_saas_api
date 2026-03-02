@@ -1,4 +1,6 @@
 import { PaginationQueryDto, TenantRepositoryFactory } from '@lib/shared';
+import { ClFile } from '@lib/shared/entities/client/files.client.entity';
+import { ClProductSupplier } from '@lib/shared/entities/client/product-suppliers.client.entity';
 import { ClProduct } from '@lib/shared/entities/client/products.client.entity';
 import { ClStockEntry } from '@lib/shared/entities/client/stock-entries.client.entity';
 import { ClStockEntryLine } from '@lib/shared/entities/client/stock-entry-lines.client.entity';
@@ -12,16 +14,24 @@ import {
 } from '@lib/shared/enums/client/stock.client.enum';
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { EntityManager, In, Repository } from 'typeorm';
 
+import {
+  BulkValidationErrorItem,
+  CreateBulkExistingProductLineDto,
+  CreateBulkNewProductLineDto,
+  CreateBulkStockReceiptDto,
+} from './dto/create-bulk-stock-receipt.dto';
 import { CreateStockEntryDto } from './dto/create-stock-entry.dto';
 import { MoveStockItemsDto } from './dto/move-stock-items.dto';
 import { QueryStockHistoryDto } from './dto/query-stock-history.dto';
 import { QueryWarehouseStockDto } from './dto/query-warehouse-stock.dto';
 import { RemoveStockItemsDto } from './dto/remove-stock-items.dto';
+import { StockReceiptLineInput } from './types';
 
 @Injectable()
 export class StockService {
@@ -29,6 +39,8 @@ export class StockService {
 
   private getRepositories(manager: EntityManager) {
     return {
+      fileRepo: manager.getRepository(ClFile),
+      productSupplierRepo: manager.getRepository(ClProductSupplier),
       stockEntryRepo: manager.getRepository(ClStockEntry),
       stockEntryLineRepo: manager.getRepository(ClStockEntryLine),
       stockItemRepo: manager.getRepository(ClStockItem),
@@ -78,6 +90,229 @@ export class StockService {
     return { page, limit, skip };
   }
 
+  private addValidationError(
+    errors: BulkValidationErrorItem[],
+    payload: BulkValidationErrorItem,
+  ) {
+    errors.push(payload);
+  }
+
+  private throwAggregatedValidationErrors(errors: BulkValidationErrorItem[]) {
+    throw new BadRequestException({
+      statusCode: 400,
+      message: 'Validation failed',
+      error: 'Bad Request',
+      errors,
+    });
+  }
+
+  private collectExistingProductsDuplicateErrors(
+    existingProducts: CreateBulkStockReceiptDto['existingProducts'],
+  ) {
+    const errors: BulkValidationErrorItem[] = [];
+    const seen = new Map<string, number>();
+
+    for (const [index, line] of (existingProducts ?? []).entries()) {
+      const key = `${line.productId}:${line.warehouseId}`;
+      if (seen.has(key)) {
+        errors.push({
+          array: 'existingProducts',
+          index,
+          field: 'productId|warehouseId',
+          message: `Duplicate pair with existingProducts[${seen.get(key)}]`,
+          code: 'DUPLICATE_PRODUCT_WAREHOUSE',
+        });
+      } else {
+        seen.set(key, index);
+      }
+    }
+
+    return errors;
+  }
+
+  private ensureBulkReceiptPayloadNotEmpty(
+    newProducts: CreateBulkNewProductLineDto[],
+    existingProducts: CreateBulkExistingProductLineDto[],
+  ) {
+    if (newProducts.length === 0 && existingProducts.length === 0) {
+      this.throwAggregatedValidationErrors([
+        {
+          array: 'newProducts',
+          index: 0,
+          field: 'newProducts|existingProducts',
+          message:
+            'At least one product line is required in newProducts or existingProducts',
+          code: 'EMPTY_PAYLOAD',
+        },
+      ]);
+    }
+  }
+
+  private async collectBulkReferenceValidationErrors(
+    newProducts: CreateBulkNewProductLineDto[],
+    existingProducts: CreateBulkExistingProductLineDto[],
+    productRepo: Repository<ClProduct>,
+    warehouseRepo: Repository<ClWarehouse>,
+  ) {
+    const errors: BulkValidationErrorItem[] = [];
+
+    for (const [index, line] of existingProducts.entries()) {
+      try {
+        await this.ensureExists(productRepo, line.productId, 'Product');
+      } catch {
+        this.addValidationError(errors, {
+          array: 'existingProducts',
+          index,
+          field: 'productId',
+          message: `Product with id ${line.productId} not found`,
+          code: 'PRODUCT_NOT_FOUND',
+        });
+      }
+
+      try {
+        await this.ensureWarehouseIsActive(warehouseRepo, line.warehouseId);
+      } catch {
+        this.addValidationError(errors, {
+          array: 'existingProducts',
+          index,
+          field: 'warehouseId',
+          message: `Warehouse with id ${line.warehouseId} is invalid or inactive`,
+          code: 'WAREHOUSE_INVALID_OR_INACTIVE',
+        });
+      }
+    }
+
+    for (const [index, line] of newProducts.entries()) {
+      try {
+        await this.ensureWarehouseIsActive(warehouseRepo, line.warehouseId);
+      } catch {
+        this.addValidationError(errors, {
+          array: 'newProducts',
+          index,
+          field: 'warehouseId',
+          message: `Warehouse with id ${line.warehouseId} is invalid or inactive`,
+          code: 'WAREHOUSE_INVALID_OR_INACTIVE',
+        });
+      }
+    }
+
+    return errors;
+  }
+
+  private async createNewProductsWithSupplierLinks(
+    newProducts: CreateBulkNewProductLineDto[],
+    supplierId: string,
+    productRepo: Repository<ClProduct>,
+    productSupplierRepo: Repository<ClProductSupplier>,
+  ) {
+    const createdNewProducts: ClProduct[] = [];
+
+    for (const newProductLine of newProducts) {
+      const productPayload = Object.fromEntries(
+        Object.entries(newProductLine).filter(
+          ([key]) =>
+            ![
+              'warehouseId',
+              'quantity',
+              'purchasePrice',
+              'productReferanceCode',
+            ].includes(key),
+        ),
+      );
+
+      const product = await productRepo.save(
+        productRepo.create(productPayload),
+      );
+      createdNewProducts.push(product);
+
+      try {
+        await productSupplierRepo.save(
+          productSupplierRepo.create({
+            productId: product.id,
+            supplierId,
+            productReferanceCode: newProductLine.productReferanceCode ?? '',
+          }),
+        );
+      } catch {
+        throw new ConflictException(
+          `Product supplier link already exists for product ${product.id}`,
+        );
+      }
+    }
+
+    return createdNewProducts;
+  }
+
+  private buildBulkStockReceiptLines(
+    newProducts: CreateBulkNewProductLineDto[],
+    existingProducts: CreateBulkExistingProductLineDto[],
+    createdNewProducts: ClProduct[],
+  ): StockReceiptLineInput[] {
+    return [
+      ...newProducts.map((line, index) => ({
+        productId: createdNewProducts[index].id,
+        warehouseId: line.warehouseId,
+        quantity: line.quantity,
+        purchasePrice: line.purchasePrice,
+      })),
+      ...existingProducts.map((line) => ({
+        productId: line.productId,
+        warehouseId: line.warehouseId,
+        quantity: line.quantity,
+        purchasePrice: line.purchasePrice,
+      })),
+    ];
+  }
+
+  private async saveLinesItemsAndHistory(
+    stockEntryId: string,
+    lines: StockReceiptLineInput[],
+    actorUserId: string,
+    stockEntryLineRepo: Repository<ClStockEntryLine>,
+    stockItemRepo: Repository<ClStockItem>,
+    stockMovementHistoryRepo: Repository<ClStockMovementHistory>,
+  ) {
+    const stockEntryLines = lines.map((line) =>
+      stockEntryLineRepo.create({
+        stockEntryId,
+        productId: line.productId,
+        warehouseId: line.warehouseId,
+        quantity: line.quantity,
+        purchasePrice: line.purchasePrice,
+      }),
+    );
+
+    await stockEntryLineRepo.save(stockEntryLines);
+
+    const itemsToCreate = lines.flatMap((line) =>
+      Array.from({ length: line.quantity }).map(() =>
+        stockItemRepo.create({
+          productId: line.productId,
+          warehouseId: line.warehouseId,
+          stockEntryId,
+          status: STOCK_ITEM_STATUSES.ACTIVE,
+          purchasePrice: line.purchasePrice,
+        }),
+      ),
+    );
+
+    const createdItems = await stockItemRepo.save(itemsToCreate);
+
+    await stockMovementHistoryRepo.save(
+      createdItems.map((item) =>
+        stockMovementHistoryRepo.create({
+          stockItemId: item.id,
+          movementType: STOCK_MOVEMENT_TYPES.ADDITION,
+          toWarehouseId: item.warehouseId,
+          stockEntryId,
+          performedByUserId: actorUserId,
+        }),
+      ),
+    );
+
+    return createdItems;
+  }
+
   async createStockEntry(
     createStockEntryDto: CreateStockEntryDto,
     actorUserId: string,
@@ -111,46 +346,119 @@ export class StockService {
         }),
       );
 
-      const lines = createStockEntryDto.lines.map((line) =>
-        stockEntryLineRepo.create({
-          stockEntryId: stockEntry.id,
-          productId: line.productId,
-          warehouseId: line.warehouseId,
-          quantity: line.quantity,
-        }),
-      );
-
-      await stockEntryLineRepo.save(lines);
-
-      const itemsToCreate = createStockEntryDto.lines.flatMap((line) =>
-        Array.from({ length: line.quantity }).map(() =>
-          stockItemRepo.create({
-            productId: line.productId,
-            warehouseId: line.warehouseId,
-            stockEntryId: stockEntry.id,
-            status: STOCK_ITEM_STATUSES.ACTIVE,
-          }),
-        ),
-      );
-
-      const createdItems = await stockItemRepo.save(itemsToCreate);
-
-      await stockMovementHistoryRepo.save(
-        createdItems.map((item) =>
-          stockMovementHistoryRepo.create({
-            stockItemId: item.id,
-            movementType: STOCK_MOVEMENT_TYPES.ADDITION,
-            toWarehouseId: item.warehouseId,
-            stockEntryId: stockEntry.id,
-            performedByUserId: actorUserId,
-          }),
-        ),
+      await this.saveLinesItemsAndHistory(
+        stockEntry.id,
+        createStockEntryDto.lines,
+        actorUserId,
+        stockEntryLineRepo,
+        stockItemRepo,
+        stockMovementHistoryRepo,
       );
 
       return stockEntryRepo.findOne({
         where: { id: stockEntry.id },
         relations: ['supplier', 'lines', 'stockItems'],
       });
+    });
+  }
+
+  async createBulkStockReceipt(
+    createBulkStockReceiptDto: CreateBulkStockReceiptDto,
+    actorUserId: string,
+  ) {
+    return this.tenantRepoFactory.executeInTransaction(async (manager) => {
+      const {
+        fileRepo,
+        productRepo,
+        productSupplierRepo,
+        stockEntryLineRepo,
+        stockEntryRepo,
+        stockItemRepo,
+        stockMovementHistoryRepo,
+        supplierRepo,
+        warehouseRepo,
+      } = this.getRepositories(manager);
+
+      const validationErrors: BulkValidationErrorItem[] = [];
+
+      const newProducts = createBulkStockReceiptDto.newProducts ?? [];
+      const existingProducts = createBulkStockReceiptDto.existingProducts ?? [];
+
+      this.ensureBulkReceiptPayloadNotEmpty(newProducts, existingProducts);
+
+      await this.ensureExists(
+        supplierRepo,
+        createBulkStockReceiptDto.supplierId,
+        'Supplier',
+      );
+
+      if (createBulkStockReceiptDto.fileId) {
+        await this.ensureExists(
+          fileRepo,
+          createBulkStockReceiptDto.fileId,
+          'File',
+        );
+      }
+
+      const duplicateErrors =
+        this.collectExistingProductsDuplicateErrors(existingProducts);
+      validationErrors.push(...duplicateErrors);
+
+      const referenceValidationErrors =
+        await this.collectBulkReferenceValidationErrors(
+          newProducts,
+          existingProducts,
+          productRepo,
+          warehouseRepo,
+        );
+      validationErrors.push(...referenceValidationErrors);
+
+      if (validationErrors.length > 0) {
+        this.throwAggregatedValidationErrors(validationErrors);
+      }
+
+      const stockEntry = await stockEntryRepo.save(
+        stockEntryRepo.create({
+          supplierId: createBulkStockReceiptDto.supplierId,
+          fileId: createBulkStockReceiptDto.fileId,
+          createdByUserId: actorUserId,
+        }),
+      );
+
+      const createdNewProducts = await this.createNewProductsWithSupplierLinks(
+        newProducts,
+        createBulkStockReceiptDto.supplierId,
+        productRepo,
+        productSupplierRepo,
+      );
+
+      const mergedLines = this.buildBulkStockReceiptLines(
+        newProducts,
+        existingProducts,
+        createdNewProducts,
+      );
+
+      const createdItems = await this.saveLinesItemsAndHistory(
+        stockEntry.id,
+        mergedLines,
+        actorUserId,
+        stockEntryLineRepo,
+        stockItemRepo,
+        stockMovementHistoryRepo,
+      );
+
+      return {
+        statusCode: 201,
+        message: 'Bulk stock receipt created successfully',
+        data: {
+          stockEntryId: stockEntry.id,
+          createdProductsCount: createdNewProducts.length,
+          existingProductsCount: existingProducts.length,
+          stockEntryLinesCount: mergedLines.length,
+          stockItemsCount: createdItems.length,
+          warnings: [] as string[],
+        },
+      };
     });
   }
 
