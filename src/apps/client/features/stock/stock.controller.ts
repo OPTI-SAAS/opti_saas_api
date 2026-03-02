@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+import { CreateBulkStockReceiptDto } from './dto/create-bulk-stock-receipt.dto';
 import { CreateStockEntryDto } from './dto/create-stock-entry.dto';
 import { MoveStockItemsDto } from './dto/move-stock-items.dto';
 import { QueryStockHistoryDto } from './dto/query-stock-history.dto';
@@ -39,10 +40,22 @@ export class StockController {
     @Body() createStockEntryDto: CreateStockEntryDto,
     @CurrentUser() user: JwtPayload,
   ) {
-    console.log('user: ', user);
-
     return await this.stockService.createStockEntry(
       createStockEntryDto,
+      user.sub,
+    );
+  }
+
+  @Post('bulk-receipt')
+  @ApiOperation({
+    summary: 'Create a bulk stock receipt with new and existing product lines',
+  })
+  async createBulkStockReceipt(
+    @Body() createBulkStockReceiptDto: CreateBulkStockReceiptDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return await this.stockService.createBulkStockReceipt(
+      createBulkStockReceiptDto,
       user.sub,
     );
   }

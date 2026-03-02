@@ -4,6 +4,7 @@ import {
   StockItemStatus,
 } from '@lib/shared/enums/client/stock.client.enum';
 import {
+  Check,
   Column,
   Entity,
   Index,
@@ -20,6 +21,10 @@ import { ClWarehouse } from './warehouses.client.entity';
 @Entity('stock_items')
 @Index('IDX_stock_items_warehouse_status', ['warehouseId', 'status'])
 @Index('IDX_stock_items_product_status', ['productId', 'status'])
+@Check(
+  'CHK_stock_items_purchase_price_non_negative',
+  'purchase_price IS NULL OR purchase_price >= 0',
+)
 export class ClStockItem extends BaseEntity {
   @Column({ name: 'product_id', type: 'uuid' })
   productId!: string;
@@ -29,6 +34,13 @@ export class ClStockItem extends BaseEntity {
 
   @Column({ name: 'stock_entry_id', type: 'uuid' })
   stockEntryId!: string;
+
+  @Column({
+    name: 'purchase_price',
+    type: 'double precision',
+    nullable: true,
+  })
+  purchasePrice?: number;
 
   @Column({
     name: 'status',
