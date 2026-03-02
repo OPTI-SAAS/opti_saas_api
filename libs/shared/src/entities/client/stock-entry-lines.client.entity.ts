@@ -12,6 +12,10 @@ import { ClWarehouse } from './warehouses.client.entity';
   'warehouseId',
 ])
 @Check('CHK_stock_entry_lines_quantity_positive', 'quantity > 0')
+@Check(
+  'CHK_stock_entry_lines_purchase_price_non_negative',
+  'purchase_price IS NULL OR purchase_price >= 0',
+)
 export class ClStockEntryLine extends BaseEntity {
   @Column({ name: 'stock_entry_id', type: 'uuid' })
   stockEntryId!: string;
@@ -24,6 +28,13 @@ export class ClStockEntryLine extends BaseEntity {
 
   @Column({ name: 'quantity', type: 'int' })
   quantity!: number;
+
+  @Column({
+    name: 'purchase_price',
+    type: 'double precision',
+    nullable: true,
+  })
+  purchasePrice?: number;
 
   @ManyToOne('ClStockEntry', 'lines', { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'stock_entry_id' })
