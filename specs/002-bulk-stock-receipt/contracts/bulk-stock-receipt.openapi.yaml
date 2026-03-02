@@ -1,0 +1,258 @@
+openapi: 3.0.3
+info:
+  title: Bulk Stock Receipt API
+  version: 1.0.0
+  description: Contract for bulk stock receipt endpoint that supports both new and existing product lines.
+
+paths:
+  /api/client/stock/bulk-receipt:
+    post:
+      summary: Create bulk stock receipt
+      description: |
+        Creates one stock entry for a supplier and processes two arrays:
+        - newProducts: create product then fill stock
+        - existingProducts: fill stock for existing product
+      tags:
+        - Stock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBulkStockReceiptRequest'
+      responses:
+        '201':
+          description: Bulk receipt created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkStockReceiptSuccessResponse'
+        '400':
+          description: Validation error with aggregated indexed details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkStockReceiptErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: Supplier or file not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotFoundErrorResponse'
+        '409':
+          description: Conflict during product-supplier link creation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConflictErrorResponse'
+
+components:
+  schemas:
+    CreateBulkStockReceiptRequest:
+      type: object
+      required:
+        - supplierId
+      properties:
+        supplierId:
+          type: string
+          format: uuid
+        fileId:
+          type: string
+          format: uuid
+          nullable: true
+        newProducts:
+          type: array
+          items:
+            $ref: '#/components/schemas/NewProductReceiptItem'
+        existingProducts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExistingProductReceiptItem'
+      additionalProperties: false
+
+    NewProductReceiptItem:
+      type: object
+      required:
+        - internalCode
+        - productType
+        - designation
+        - pricingMode
+        - warehouseId
+        - quantity
+        - purchasePrice
+      properties:
+        internalCode:
+          type: string
+        productType:
+          type: string
+        designation:
+          type: string
+        brand:
+          type: string
+        model:
+          type: string
+        pricingMode:
+          type: string
+        coefficient:
+          type: number
+        fixedPrice:
+          type: number
+        fixedAddedAmount:
+          type: number
+        vatId:
+          type: string
+          format: uuid
+        warehouseId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+        purchasePrice:
+          type: number
+          minimum: 0
+        productReferanceCode:
+          type: string
+          nullable: true
+      additionalProperties: false
+
+    ExistingProductReceiptItem:
+      type: object
+      required:
+        - productId
+        - warehouseId
+        - quantity
+        - purchasePrice
+      properties:
+        productId:
+          type: string
+          format: uuid
+        warehouseId:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+        purchasePrice:
+          type: number
+          minimum: 0
+      additionalProperties: false
+
+    BulkStockReceiptSuccessResponse:
+      type: object
+      required:
+        - statusCode
+        - message
+        - data
+      properties:
+        statusCode:
+          type: integer
+          example: 201
+        message:
+          type: string
+          example: Bulk stock receipt created successfully
+        data:
+          type: object
+          required:
+            - stockEntryId
+            - createdProductsCount
+            - existingProductsCount
+            - stockEntryLinesCount
+            - stockItemsCount
+          properties:
+            stockEntryId:
+              type: string
+              format: uuid
+            createdProductsCount:
+              type: integer
+            existingProductsCount:
+              type: integer
+            stockEntryLinesCount:
+              type: integer
+            stockItemsCount:
+              type: integer
+            warnings:
+              type: array
+              items:
+                type: string
+
+    BulkStockReceiptErrorResponse:
+      type: object
+      required:
+        - statusCode
+        - message
+        - error
+      properties:
+        statusCode:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Validation failed
+        error:
+          type: string
+          example: Bad Request
+        errors:
+          type: array
+          description: Aggregated list of item-level validation errors.
+          items:
+            $ref: '#/components/schemas/AggregatedValidationError'
+
+    AggregatedValidationError:
+      type: object
+      required:
+        - array
+        - index
+        - field
+        - message
+      properties:
+        array:
+          type: string
+          enum: [newProducts, existingProducts]
+        index:
+          type: integer
+          minimum: 0
+        field:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+
+    NotFoundErrorResponse:
+      type: object
+      required:
+        - statusCode
+        - message
+        - error
+      properties:
+        statusCode:
+          type: integer
+          example: 404
+        message:
+          type: string
+          example: Supplier with id 00000000-0000-0000-0000-000000000001 not found
+        error:
+          type: string
+          example: Not Found
+
+    ConflictErrorResponse:
+      type: object
+      required:
+        - statusCode
+        - message
+        - error
+      properties:
+        statusCode:
+          type: integer
+          example: 409
+        message:
+          type: string
+          example: Product supplier link already exists for product 00000000-0000-0000-0000-000000000010
+        error:
+          type: string
+          example: Conflict
