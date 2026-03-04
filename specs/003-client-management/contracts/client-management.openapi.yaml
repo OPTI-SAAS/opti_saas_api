@@ -1,0 +1,971 @@
+openapi: 3.0.3
+info:
+  title: Client Management API
+  description: |
+    REST API for managing optical store clients (particulier, passage, professionnel),
+    conventions, and internal contacts. All endpoints require JWT authentication
+    and are tenant-scoped.
+  version: 1.0.0
+
+servers:
+  - url: /api
+    description: API base path
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Clients
+    description: Client CRUD operations (all types)
+  - name: Conventions
+    description: Convention management for professional clients
+  - name: Internal Contacts
+    description: Internal contact management for professional clients
+
+paths:
+  /client/clients:
+    post:
+      tags: [Clients]
+      summary: Create a new client
+      description: |
+        Creates a client of the specified type. Required fields vary by type:
+        - `particulier`: title, lastName, firstName, birthDate required
+        - `passage`: no type-specific required fields
+        - `professionnel`: companyName, taxId, ice, vatExempt required
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateClientRequest'
+      responses:
+        '201':
+          description: Client created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Conflict (e.g., duplicate ICE)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags: [Clients]
+      summary: List clients with pagination and filters
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: type
+          in: query
+          description: Filter by client type
+          schema:
+            $ref: '#/components/schemas/ClientType'
+        - name: active
+          in: query
+          description: Filter by active status. Defaults to true (only active clients)
+          schema:
+            type: boolean
+            default: true
+        - name: search
+          in: query
+          description: Case-insensitive partial match on lastName, firstName, or companyName
+          schema:
+            type: string
+        - name: familyGroupId
+          in: query
+          description: Filter by family group ID (returns all members of the group)
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paginated client list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /client/clients/{id}:
+    get:
+      tags: [Clients]
+      summary: Get client by ID
+      description: Returns the full client profile including type-specific fields, convention (if professionnel), and contacts (if professionnel).
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - $ref: '#/components/parameters/ClientId'
+      responses:
+        '200':
+          description: Client details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientDetailResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Clients]
+      summary: Update client fields
+      description: |
+        Updates mutable client fields. The `type` field is immutable and will be rejected if included.
+        For particulier clients, medical record is replaced entirely when provided.
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - $ref: '#/components/parameters/ClientId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientRequest'
+      responses:
+        '200':
+          description: Client updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientResponse'
+        '400':
+          description: Validation error (includes type immutability rejection)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /client/clients/{id}/deactivate:
+    patch:
+      tags: [Clients]
+      summary: Deactivate a client
+      description: Sets `active` to false. Client is excluded from default list queries.
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - $ref: '#/components/parameters/ClientId'
+      responses:
+        '200':
+          description: Client deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /client/clients/{id}/reactivate:
+    patch:
+      tags: [Clients]
+      summary: Reactivate a client
+      description: Sets `active` to true.
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - $ref: '#/components/parameters/ClientId'
+      responses:
+        '200':
+          description: Client reactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /client/clients/{clientId}/convention:
+    put:
+      tags: [Conventions]
+      summary: Create or update convention for a professional client
+      description: |
+        Creates a convention if none exists, or updates the existing one.
+        Only allowed for clients with type `professionnel`.
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConventionRequest'
+      responses:
+        '200':
+          description: Convention created or updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConventionResponse'
+        '400':
+          description: Validation error or client is not professionnel
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Conventions]
+      summary: Remove convention from a professional client
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Convention removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: Convention removed successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /client/clients/{clientId}/contacts:
+    get:
+      tags: [Internal Contacts]
+      summary: List internal contacts for a professional client
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of internal contacts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 200
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ContactInterneResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Internal Contacts]
+      summary: Add an internal contact to a professional client
+      description: |
+        If the new contact is marked as `principal`, the existing principal contact
+        (if any) is automatically unmarked.
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateContactInterneRequest'
+      responses:
+        '201':
+          description: Contact created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactInterneResponse'
+        '400':
+          description: Validation error or client is not professionnel
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /client/clients/{clientId}/contacts/{contactId}:
+    patch:
+      tags: [Internal Contacts]
+      summary: Update an internal contact
+      description: |
+        If `principal` is set to true, the existing principal contact is automatically unmarked.
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateContactInterneRequest'
+      responses:
+        '200':
+          description: Contact updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContactInterneResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Internal Contacts]
+      summary: Delete an internal contact
+      parameters:
+        - $ref: '#/components/parameters/TenantHeader'
+        - name: clientId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Contact deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                    example: 200
+                  message:
+                    type: string
+                    example: Contact deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    TenantHeader:
+      name: x-tenant-id
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: Tenant identifier
+    ClientId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    ClientType:
+      type: string
+      enum: [particulier, passage, professionnel]
+
+    CreateClientRequest:
+      type: object
+      required: [type]
+      properties:
+        type:
+          $ref: '#/components/schemas/ClientType'
+        # Base fields
+        phone:
+          type: string
+          example: '0612345678'
+        email:
+          type: string
+          format: email
+          example: client@example.com
+        city:
+          type: string
+          example: Casablanca
+        address:
+          type: string
+          example: '123 Rue Mohammed V'
+        # Particulier fields
+        title:
+          type: string
+          enum: [Mr, Mme, Mlle]
+        lastName:
+          type: string
+          example: Benali
+        firstName:
+          type: string
+          example: Youssef
+        birthDate:
+          type: string
+          format: date
+          example: '1990-05-15'
+        sponsorId:
+          type: string
+          format: uuid
+        spouseName:
+          type: string
+        idDocumentType:
+          type: string
+          enum: [CIN, Passport, Carte de séjour]
+        idDocumentNumber:
+          type: string
+        familyGroupId:
+          type: integer
+        familyLink:
+          type: string
+        isOpticalBeneficiary:
+          type: boolean
+        isFinancialResponsible:
+          type: boolean
+        hasSharedMutual:
+          type: boolean
+        hasSharedAddress:
+          type: boolean
+        hasSocialCoverage:
+          type: boolean
+        coverageType:
+          type: string
+        membershipNumber:
+          type: string
+        medicalRecord:
+          type: object
+          additionalProperties: true
+          description: Open-schema JSON object. No rigid field list enforced.
+          example: { 'currentlyWearing': 'glasses', 'hasDryness': true }
+        notes:
+          type: string
+        # Professionnel fields
+        companyName:
+          type: string
+          example: OptikVision SARL
+        taxId:
+          type: string
+          example: '12345678'
+        ice:
+          type: string
+          example: '001234567000012'
+        commercialRegister:
+          type: string
+        tradeLicense:
+          type: string
+        vatExempt:
+          type: boolean
+      discriminator:
+        propertyName: type
+
+    UpdateClientRequest:
+      type: object
+      description: |
+        All fields are optional. The `type` field MUST NOT be included (immutable).
+        Only type-appropriate fields will be accepted.
+      properties:
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+        city:
+          type: string
+        address:
+          type: string
+        title:
+          type: string
+          enum: [Mr, Mme, Mlle]
+        lastName:
+          type: string
+        firstName:
+          type: string
+        birthDate:
+          type: string
+          format: date
+        sponsorId:
+          type: string
+          format: uuid
+          nullable: true
+        spouseName:
+          type: string
+        idDocumentType:
+          type: string
+          enum: [CIN, Passport, Carte de séjour]
+        idDocumentNumber:
+          type: string
+        familyGroupId:
+          type: integer
+          nullable: true
+        familyLink:
+          type: string
+          nullable: true
+        isOpticalBeneficiary:
+          type: boolean
+        isFinancialResponsible:
+          type: boolean
+        hasSharedMutual:
+          type: boolean
+        hasSharedAddress:
+          type: boolean
+        hasSocialCoverage:
+          type: boolean
+        coverageType:
+          type: string
+        membershipNumber:
+          type: string
+        medicalRecord:
+          type: object
+          additionalProperties: true
+        notes:
+          type: string
+        companyName:
+          type: string
+        taxId:
+          type: string
+        ice:
+          type: string
+        commercialRegister:
+          type: string
+        tradeLicense:
+          type: string
+        vatExempt:
+          type: boolean
+
+    ClientResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 201
+        data:
+          $ref: '#/components/schemas/ClientObject'
+
+    ClientDetailResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        data:
+          allOf:
+            - $ref: '#/components/schemas/ClientObject'
+            - type: object
+              properties:
+                convention:
+                  $ref: '#/components/schemas/ConventionObject'
+                  nullable: true
+                contactsInternes:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ContactInterneObject'
+
+    ClientListResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClientObject'
+        meta:
+          $ref: '#/components/schemas/PaginationMeta'
+
+    ClientObject:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/ClientType'
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+        # Particulier/Passage
+        title:
+          type: string
+          nullable: true
+        lastName:
+          type: string
+          nullable: true
+        firstName:
+          type: string
+          nullable: true
+        birthDate:
+          type: string
+          format: date
+          nullable: true
+        sponsorId:
+          type: string
+          format: uuid
+          nullable: true
+        spouseName:
+          type: string
+          nullable: true
+        idDocumentType:
+          type: string
+          nullable: true
+        idDocumentNumber:
+          type: string
+          nullable: true
+        familyGroupId:
+          type: integer
+          nullable: true
+        familyLink:
+          type: string
+          nullable: true
+        isOpticalBeneficiary:
+          type: boolean
+          nullable: true
+        isFinancialResponsible:
+          type: boolean
+          nullable: true
+        hasSharedMutual:
+          type: boolean
+          nullable: true
+        hasSharedAddress:
+          type: boolean
+          nullable: true
+        hasSocialCoverage:
+          type: boolean
+          nullable: true
+        coverageType:
+          type: string
+          nullable: true
+        membershipNumber:
+          type: string
+          nullable: true
+        medicalRecord:
+          type: object
+          additionalProperties: true
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        # Professionnel
+        companyName:
+          type: string
+          nullable: true
+        taxId:
+          type: string
+          nullable: true
+        ice:
+          type: string
+          nullable: true
+        commercialRegister:
+          type: string
+          nullable: true
+        tradeLicense:
+          type: string
+          nullable: true
+        vatExempt:
+          type: boolean
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ConventionRequest:
+      type: object
+      required: [numero, tauxRemise, plafondCredit, delaiPaiement]
+      properties:
+        numero:
+          type: string
+          example: CONV-2026-001
+        dateDebut:
+          type: string
+          format: date
+          nullable: true
+          example: '2026-01-01'
+        dateFin:
+          type: string
+          format: date
+          nullable: true
+          example: '2026-12-31'
+        tauxRemise:
+          type: number
+          format: float
+          example: 10.0
+        plafondCredit:
+          type: number
+          format: float
+          example: 50000
+        delaiPaiement:
+          type: integer
+          example: 30
+        notes:
+          type: string
+          nullable: true
+
+    ConventionResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 200
+        data:
+          $ref: '#/components/schemas/ConventionObject'
+
+    ConventionObject:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        clientId:
+          type: string
+          format: uuid
+        numero:
+          type: string
+        dateDebut:
+          type: string
+          format: date
+          nullable: true
+        dateFin:
+          type: string
+          format: date
+          nullable: true
+        tauxRemise:
+          type: number
+        plafondCredit:
+          type: number
+        delaiPaiement:
+          type: integer
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateContactInterneRequest:
+      type: object
+      required: [nom, prenom, fonction, telephone, email, principal]
+      properties:
+        nom:
+          type: string
+          example: Alami
+        prenom:
+          type: string
+          example: Sara
+        fonction:
+          type: string
+          example: Responsable RH
+        telephone:
+          type: string
+          example: '0612345678'
+        email:
+          type: string
+          format: email
+          example: s.alami@company.ma
+        principal:
+          type: boolean
+          example: true
+
+    UpdateContactInterneRequest:
+      type: object
+      properties:
+        nom:
+          type: string
+        prenom:
+          type: string
+        fonction:
+          type: string
+        telephone:
+          type: string
+        email:
+          type: string
+          format: email
+        principal:
+          type: boolean
+
+    ContactInterneResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 201
+        data:
+          $ref: '#/components/schemas/ContactInterneObject'
+
+    ContactInterneObject:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        clientId:
+          type: string
+          format: uuid
+        nom:
+          type: string
+        prenom:
+          type: string
+        fonction:
+          type: string
+        telephone:
+          type: string
+        email:
+          type: string
+        principal:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 50
+        pages:
+          type: integer
+          example: 5
+        hasPrev:
+          type: boolean
+          example: false
+        hasNext:
+          type: boolean
+          example: true
+
+    ErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+          example: 400
+        message:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+        error:
+          type: string
+          example: Bad Request

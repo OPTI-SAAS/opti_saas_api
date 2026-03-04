@@ -1,33 +1,35 @@
 <!--
   SYNC IMPACT REPORT
   ==================
-  Version change: 0.0.0 (template) → 1.0.0
-  Bump rationale: MAJOR — initial ratification of all principles;
-                  no prior version existed.
+  Version change: 1.0.0 → 1.1.0
+  Bump rationale: MINOR — new principle added (IX. Domain Modeling
+                  & Flexible Data) to codify guidance on polymorphic
+                  entities, discriminated unions, and JSON/JSONB
+                  open-schema columns introduced by the Clients
+                  feature.
 
   Modified principles:
-    - (new) I. Architecture & Domain-Driven Design
-    - (new) II. Multi-Tenancy Isolation (HARD INVARIANT)
-    - (new) III. Security by Default
-    - (new) IV. Database & Data Consistency
-    - (new) V. TypeScript & Code Quality
-    - (new) VI. Testing & Quality Gates
-    - (new) VII. Observability & Operations
-    - (new) VIII. API Standards
+    - (unchanged) I. Architecture & Domain-Driven Design
+    - (unchanged) II. Multi-Tenancy Isolation (HARD INVARIANT)
+    - (unchanged) III. Security by Default
+    - (unchanged) IV. Database & Data Consistency
+    - (unchanged) V. TypeScript & Code Quality
+    - (unchanged) VI. Testing & Quality Gates
+    - (unchanged) VII. Observability & Operations
+    - (unchanged) VIII. API Standards
+    - (new) IX. Domain Modeling & Flexible Data
 
-  Added sections:
-    - Enforcement & Compliance
-    - Technology Context
+  Added sections: none (principle added within Core Principles)
 
-  Removed sections: none (template placeholders replaced)
+  Removed sections: none
 
   Templates requiring updates:
-    - .specify/templates/plan-template.md        ✅ compatible (Constitution
-      Check section is dynamic; principles are referenced at plan time)
-    - .specify/templates/spec-template.md         ✅ compatible (no
-      constitution-specific tokens)
-    - .specify/templates/tasks-template.md        ✅ compatible (task
-      categorisation is project-driven, not principle-specific)
+    - .specify/templates/plan-template.md        ✅ compatible
+      (Constitution Check section is dynamic)
+    - .specify/templates/spec-template.md         ✅ compatible
+      (no constitution-specific tokens)
+    - .specify/templates/tasks-template.md        ✅ compatible
+      (task categorisation is project-driven)
     - .specify/templates/checklist-template.md    ✅ compatible
 
   Follow-up TODOs: none
@@ -218,6 +220,49 @@
 - Request and response DTOs MUST be explicitly defined. Controllers
   MUST NOT return raw entity objects to API consumers.
 
+### IX. Domain Modeling & Flexible Data
+
+- **Polymorphic entities** that share a common base but diverge by
+  type MUST use a discriminator column (e.g., `type`) stored as a
+  database-level `CHECK` or `ENUM` constraint. The discriminator
+  value MUST match the TypeScript discriminated-union literal type.
+- Type-specific fields for a polymorphic entity MAY be stored in
+  the same table (single-table inheritance) when the number of
+  nullable type-specific columns is manageable. When type-specific
+  complexity grows, dedicated child tables joined by foreign key
+  are preferred.
+- Type guard functions (e.g., `isClientParticulier(client)`) MUST
+  be provided in the domain layer for every discriminated union.
+  Downstream code MUST use these guards instead of raw string
+  comparisons against the discriminator.
+- **JSON/JSONB columns** are permitted for genuinely open-schema
+  data where the field set is intentionally unstructured or
+  user-defined (e.g., medical records, custom metadata, form
+  responses). JSONB columns MUST NOT be used as a shortcut to
+  avoid proper relational modeling for well-known, queryable
+  fields.
+- Data stored in JSONB columns MUST be validated at the application
+  layer (DTO pipe or service) to guarantee the value is a valid
+  JSON object. Beyond structural validity, the application MUST
+  NOT enforce a rigid schema on intentionally open JSONB fields—
+  the consuming UI or domain process owns field interpretation.
+- JSONB columns MUST have a PostgreSQL `DEFAULT '{}'::jsonb` or
+  `DEFAULT 'null'` and MUST NOT be left without a default when
+  the column is nullable.
+- Queries that filter or sort on JSONB sub-paths in production
+  workloads MUST be backed by a GIN index or an expression index
+  on the relevant path.
+- **Nested child entities** (e.g., conventions, internal contacts)
+  that have independent identity MUST be modeled as separate
+  tables with proper foreign keys—not embedded inside a parent
+  JSONB column. One-to-many children MUST use a junction or
+  child table with cascading delete/update rules defined at the
+  database level.
+- Value objects without independent identity (e.g., an address
+  block reused across entities) MAY be stored as JSONB if they
+  are always read/written as a whole and never queried
+  independently.
+
 ## Enforcement & Compliance
 
 - This constitution is the highest-authority engineering document for
@@ -251,4 +296,4 @@
   conflicts with this constitution, the constitution prevails. The
   plan MUST be revised to comply, or an amendment MUST be proposed.
 
-**Version**: 1.0.0 | **Ratified**: 2026-03-01 | **Last Amended**: 2026-03-01
+**Version**: 1.1.0 | **Ratified**: 2026-03-01 | **Last Amended**: 2026-03-04
