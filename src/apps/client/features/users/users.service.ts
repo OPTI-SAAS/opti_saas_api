@@ -2,6 +2,7 @@ import {
   BACKOFFICE_CONNECTION,
   BoTenant,
   BoUser,
+  BoUserStatus,
   BoUserTenant,
   ClRole,
   ClUserRole,
@@ -21,6 +22,7 @@ import {
 import { DataSource, In, Repository } from 'typeorm';
 
 import { AssignRoleDto, CreateUserDto, UpdateUserDto } from './dto';
+import { ActivateUserDto } from './dto/activate-user.dto';
 import {
   TenantWithRoleDto,
   UserWithTenantsResponseDto,
@@ -120,6 +122,9 @@ export class UsersService {
           'firstName',
           'lastName',
           'email',
+          'mobile',
+          'status',
+          'lastLoginAt',
           'createdAt',
           'updatedAt',
         ],
@@ -156,7 +161,7 @@ export class UsersService {
     createUserDto: CreateUserDto,
     currentUserId: string,
   ): Promise<BoUser> {
-    const { firstName, lastName, email, password } = createUserDto;
+    const { firstName, lastName, email, password, mobile } = createUserDto;
 
     // Check if user with this email already exists
     const existingUser = await this.userRepository.findOne({
@@ -175,6 +180,9 @@ export class UsersService {
     user.lastName = lastName ?? '';
     user.email = email;
     user.tenantGroupId = tenantGroupId;
+    if (mobile) {
+      user.mobile = mobile;
+    }
     await user.setPassword(password);
 
     try {
@@ -248,6 +256,11 @@ export class UsersService {
     if (lastName !== undefined) {
       // Trim and set lastName (empty string is allowed to clear)
       user.lastName = lastName.trim();
+    }
+
+    const { mobile } = updateUserDto;
+    if (mobile !== undefined) {
+      user.mobile = mobile;
     }
 
     try {
@@ -333,6 +346,33 @@ export class UsersService {
     );
 
     return Object.assign(user, { tenants: tenantsWithRoles });
+  }
+
+  // ==================== ACTIVATE/DEACTIVATE USER ====================
+  /**
+   * Activate or deactivate a user (admin only)
+   * Sets user status to 'active' or 'inactive'
+   */
+  async activateUser(
+    targetUserId: string,
+    activateUserDto: ActivateUserDto,
+    currentUserId: string,
+  ): Promise<BoUser> {
+    // Verify both users exist and belong to the same tenant group
+    const { targetUser: user } = await this.verifyUsersInSameTenantGroup(
+      currentUserId,
+      targetUserId,
+    );
+
+    user.status = activateUserDto.active
+      ? BoUserStatus.active
+      : BoUserStatus.inactive;
+
+    try {
+      return await this.userRepository.save(user);
+    } catch (error) {
+      handleDbError(error);
+    }
   }
 
   // ==================== TASK 5: PUT /users/:id/assign-roles ====================

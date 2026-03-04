@@ -45,7 +45,13 @@ export class TenantGuard implements CanActivate {
       throw new ForbiddenException('User not authenticated');
     }
 
-    const userId = 'userId' in user ? user.userId : user.id;
+    // JwtAuthGuard sets raw JWT payload (sub), while Passport strategy maps to userId
+    const userId =
+      'userId' in user
+        ? (user as { userId: string }).userId
+        : 'sub' in user
+          ? (user as { sub: string }).sub
+          : (user as { id: string }).id;
 
     // Verify tenant exists and user has access
     const hasAccess = await this.verifyTenantAccess(userId, tenantId);
@@ -80,12 +86,7 @@ export class TenantGuard implements CanActivate {
     // Get user with their tenant memberships and owned tenant group
     const user = await userRepository.findOne({
       where: { id: userId },
-      relations: [
-        'tenantMemberships',
-        'tenantMemberships.tenant',
-        'ownedTenantGroup',
-        'ownedTenantGroup.tenants',
-      ],
+      relations: ['tenantMemberships', 'tenantMemberships.tenant'],
     });
 
     if (!user) {

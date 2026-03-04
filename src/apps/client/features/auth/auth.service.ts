@@ -1,6 +1,7 @@
 import {
   BACKOFFICE_CONNECTION,
   BoUser,
+  BoUserStatus,
   ClRole,
   ClRoleAuthorizationsView,
   ClUserRole,
@@ -55,6 +56,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // Check if the account is active
+    if (user.status !== BoUserStatus.active) {
+      throw new UnauthorizedException('Account is not active');
+    }
+
     // Generate JWT tokens
     const payload = {
       sub: user.id,
@@ -65,8 +71,9 @@ export class AuthService {
       this.generateRefreshToken(payload),
     ]);
 
-    // Store hashed refresh token in database
+    // Store hashed refresh token in database and update last login
     user.refreshToken = await bycryptHashPassword(refreshToken);
+    user.lastLoginAt = new Date();
     await this.userRepository.save(user);
 
     return {

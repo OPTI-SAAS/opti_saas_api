@@ -1,9 +1,11 @@
 import {
+  AdminGuard,
   BoUser,
   ClientController,
   CurrentUser,
   JwtAuthGuard,
   PaginationQueryDto,
+  TenantGuard,
 } from '@lib/shared';
 import { AuthenticatedUser } from '@lib/shared/types';
 import {
@@ -26,6 +28,7 @@ import {
 } from '@nestjs/swagger';
 
 import {
+  ActivateUserDto,
   AssignRoleDto,
   CreateUserDto,
   PaginatedUsersResponseDto,
@@ -165,5 +168,25 @@ export class UsersController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.usersService.assignRoles(id, assignRoleDto, user.userId);
+  }
+
+  /**
+   * PATCH /users/:id/activate
+   * Activate or deactivate a user (admin only)
+   */
+  @Patch(':id/activate')
+  @UseGuards(JwtAuthGuard, TenantGuard, AdminGuard)
+  @ApiOperation({
+    summary: 'Activate or deactivate a user',
+    description:
+      'Activate or deactivate a user account. Only admin users can perform this action. Requires x-tenant-id header.',
+  })
+  @ApiOkResponse({ type: BoUser })
+  async activateUser(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() activateUserDto: ActivateUserDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<BoUser> {
+    return this.usersService.activateUser(id, activateUserDto, user.userId);
   }
 }
