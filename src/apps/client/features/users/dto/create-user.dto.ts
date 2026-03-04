@@ -3,6 +3,7 @@ import {
   IsEmail,
   IsNotEmpty,
   IsOptional,
+  IsPhoneNumber,
   IsString,
   IsStrongPassword,
   MaxLength,
@@ -30,6 +31,16 @@ export class BaseUserFieldsDto {
     example: 'Doe',
   })
   lastName?: string;
+
+  @IsOptional()
+  @IsPhoneNumber()
+  @MaxLength(20)
+  @ApiPropertyOptional({
+    description:
+      'Mobile phone number of the user (optional, E.164 format recommended)',
+    example: '+33612345678',
+  })
+  mobile?: string;
 }
 
 /**

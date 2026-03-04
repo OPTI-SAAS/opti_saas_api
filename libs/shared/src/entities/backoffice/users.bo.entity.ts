@@ -3,6 +3,10 @@ import { Exclude } from 'class-transformer';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 import { BaseEntity } from '../../base';
+import {
+  BoUserStatus,
+  TBoUserStatus,
+} from '../../enums/backoffice/users.bo.enum';
 import { BoTenantGroup } from './tenant-groups.bo.entity';
 import { BoUserTenant } from './user-tenants.bo.entity';
 
@@ -24,6 +28,29 @@ export class BoUser extends BaseEntity {
 
   @Column({ unique: true, type: 'varchar', length: 255 })
   email!: string;
+
+  @Column({
+    type: 'varchar',
+    name: 'mobile',
+    length: 20,
+    nullable: true,
+  })
+  mobile?: string;
+
+  @Column({
+    type: 'varchar',
+    name: 'status',
+    length: 30,
+    default: "'active'",
+  })
+  status!: TBoUserStatus;
+
+  @Column({
+    type: 'timestamp with time zone',
+    name: 'last_login_at',
+    nullable: true,
+  })
+  lastLoginAt?: Date;
 
   @Column({
     type: 'varchar',
@@ -63,6 +90,9 @@ export class BoUser extends BaseEntity {
   constructor(data: Partial<BoUser> = {}) {
     super();
     Object.assign(this, data);
+    if (!this.status) {
+      this.status = BoUserStatus.active;
+    }
   }
 
   get password(): string {
