@@ -1,3 +1,4 @@
+export * from './client.client.enum';
 export * from './file.client.enum';
 export * from './product.client.enum';
 export * from './questions.client.enum';
