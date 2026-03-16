@@ -1,5 +1,5 @@
 import { bycryptHashPassword, comparePassword } from '@lib/shared/helpers';
-import { Exclude } from 'class-transformer';
+import { Exclude, Expose } from 'class-transformer';
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 import { BaseEntity } from '../../base';
@@ -31,11 +31,27 @@ export class BoUser extends BaseEntity {
 
   @Column({
     type: 'varchar',
-    name: 'mobile',
+    name: 'mobile_phone',
     length: 20,
     nullable: true,
   })
-  mobile?: string;
+  mobilePhone?: string;
+
+  @Column({
+    type: 'varchar',
+    name: 'mobile_country_code',
+    length: 10,
+    nullable: true,
+  })
+  mobileCountryCode?: string;
+
+  @Column({
+    type: 'varchar',
+    name: 'agreement',
+    length: 255,
+    nullable: true,
+  })
+  agreement?: string;
 
   @Column({
     type: 'varchar',
@@ -43,7 +59,13 @@ export class BoUser extends BaseEntity {
     length: 30,
     default: "'active'",
   })
+  @Exclude()
   status!: TBoUserStatus;
+
+  @Expose()
+  get active(): boolean {
+    return this.status === BoUserStatus.active;
+  }
 
   @Column({
     type: 'timestamp with time zone',
