@@ -3,10 +3,10 @@ import {
   IsEmail,
   IsNotEmpty,
   IsOptional,
-  IsPhoneNumber,
   IsString,
   IsStrongPassword,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 
 /**
@@ -32,15 +32,40 @@ export class BaseUserFieldsDto {
   })
   lastName?: string;
 
-  @IsOptional()
-  @IsPhoneNumber()
+  @ValidateIf((o) => !!o.mobileCountryCode || !!o.mobilePhone)
+  @IsNotEmpty({
+    message: 'mobilePhone is required when mobileCountryCode is provided',
+  })
+  @IsString()
   @MaxLength(20)
   @ApiPropertyOptional({
     description:
       'Mobile phone number of the user (optional, E.164 format recommended)',
-    example: '+33612345678',
+    example: '612345678',
   })
-  mobile?: string;
+  mobilePhone?: string;
+
+  @ValidateIf((o) => !!o.mobileCountryCode || !!o.mobilePhone)
+  @IsNotEmpty({
+    message: 'mobileCountryCode is required when mobilePhone is provided',
+  })
+  @IsString()
+  @MaxLength(10)
+  @ApiPropertyOptional({
+    description:
+      'Country code prefix for the mobile phone (required when mobilePhone is provided)',
+    example: '+33',
+  })
+  mobileCountryCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  @ApiPropertyOptional({
+    description: 'Agreement reference (optional)',
+    example: null,
+  })
+  agreement?: string;
 }
 
 /**

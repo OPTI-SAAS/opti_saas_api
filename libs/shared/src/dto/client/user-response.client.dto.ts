@@ -1,7 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import { BaseResponseDto } from '../../base';
-import { TUserStatus } from '../../enums/client';
 
 export class UserResponseDto extends BaseResponseDto {
   @ApiProperty({ example: 'John' })
@@ -13,8 +12,17 @@ export class UserResponseDto extends BaseResponseDto {
   @ApiProperty({ example: 'johnDoe@gmail.com' })
   email!: string;
 
-  @ApiProperty({ example: 'active' })
-  status!: TUserStatus;
+  @ApiPropertyOptional({ example: '612345678' })
+  mobilePhone?: string;
+
+  @ApiPropertyOptional({ example: '+33' })
+  mobileCountryCode?: string;
+
+  @ApiPropertyOptional({ example: null })
+  agreement?: string;
+
+  @ApiProperty({ example: true })
+  active!: boolean;
 
   @ApiProperty({ example: false })
   isOwner?: boolean;

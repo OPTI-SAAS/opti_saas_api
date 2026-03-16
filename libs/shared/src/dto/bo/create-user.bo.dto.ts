@@ -1,12 +1,14 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsAlphanumeric,
   IsEmail,
   IsNotEmpty,
   IsOptional,
+  IsString,
   Length,
   Matches,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 
 import { CLIENT_USER_PASSWORD_REGEX } from '../../constants';
@@ -38,4 +40,28 @@ export class BoCreateUserDto {
     example: 'Hello12345',
   })
   password!: string;
+
+  @ValidateIf((o) => !!o.mobileCountryCode || !!o.mobilePhone)
+  @IsNotEmpty({
+    message: 'mobilePhone is required when mobileCountryCode is provided',
+  })
+  @IsString()
+  @MaxLength(20)
+  @ApiPropertyOptional({ example: '612345678' })
+  mobilePhone?: string;
+
+  @ValidateIf((o) => !!o.mobileCountryCode || !!o.mobilePhone)
+  @IsNotEmpty({
+    message: 'mobileCountryCode is required when mobilePhone is provided',
+  })
+  @IsString()
+  @MaxLength(10)
+  @ApiPropertyOptional({ example: '+33' })
+  mobileCountryCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  @ApiPropertyOptional({ example: null })
+  agreement?: string;
 }

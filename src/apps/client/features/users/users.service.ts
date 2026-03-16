@@ -122,7 +122,9 @@ export class UsersService {
           'firstName',
           'lastName',
           'email',
-          'mobile',
+          'mobilePhone',
+          'mobileCountryCode',
+          'agreement',
           'status',
           'lastLoginAt',
           'createdAt',
@@ -161,7 +163,15 @@ export class UsersService {
     createUserDto: CreateUserDto,
     currentUserId: string,
   ): Promise<BoUser> {
-    const { firstName, lastName, email, password, mobile } = createUserDto;
+    const {
+      firstName,
+      lastName,
+      email,
+      password,
+      mobilePhone,
+      mobileCountryCode,
+      agreement,
+    } = createUserDto;
 
     // Check if user with this email already exists
     const existingUser = await this.userRepository.findOne({
@@ -180,8 +190,12 @@ export class UsersService {
     user.lastName = lastName ?? '';
     user.email = email;
     user.tenantGroupId = tenantGroupId;
-    if (mobile) {
-      user.mobile = mobile;
+    if (mobilePhone) {
+      user.mobilePhone = mobilePhone;
+      user.mobileCountryCode = mobileCountryCode;
+    }
+    if (agreement) {
+      user.agreement = agreement;
     }
     await user.setPassword(password);
 
@@ -258,9 +272,17 @@ export class UsersService {
       user.lastName = lastName.trim();
     }
 
-    const { mobile } = updateUserDto;
-    if (mobile !== undefined) {
-      user.mobile = mobile;
+    const { mobilePhone, mobileCountryCode, agreement } = updateUserDto;
+    if (mobilePhone !== undefined) {
+      user.mobilePhone = mobilePhone;
+      if (mobilePhone) {
+        user.mobileCountryCode = mobileCountryCode;
+      } else {
+        user.mobileCountryCode = undefined;
+      }
+    }
+    if (agreement !== undefined) {
+      user.agreement = agreement;
     }
 
     try {
