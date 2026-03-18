@@ -45,8 +45,8 @@ importers:
         specifier: ^11.0.0
         version: 11.0.0(@nestjs/common@11.1.9(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.9)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.28(pg@8.16.3)(ts-node@10.9.2(@swc/core@1.15.3)(@types/node@22.19.1)(typescript@5.9.3)))
       '@optisaas/opti-saas-lib':
-        specifier: ^0.1.8
-        version: 0.1.8
+        specifier: ^0.1.9
+        version: 0.1.9
       '@types/body-parser':
         specifier: ^1.19.5
         version: 1.19.6
@@ -1166,8 +1166,8 @@ packages:
     engines: {node: ^14.18.0 || >=16.10.0, npm: '>=5.10.0'}
     hasBin: true
 
-  '@optisaas/opti-saas-lib@0.1.8':
-    resolution: {integrity: sha512-vz+wHGWkD1PtKyzPYShqAQNAgkgTAywpy7BL6+/GABj7+eF+/k+/W/QeZQe4vY+EBWqST5CL5Tjcw4pBYpBfpQ==}
+  '@optisaas/opti-saas-lib@0.1.9':
+    resolution: {integrity: sha512-j2PoVsyA+GVWD6JPHSIk8c4A8gHVS2TsT3p7CCdUBrWgKdqUJK6OkYsClU00g6BfFY60Gjzs5rzYibI/HBTXug==}
     engines: {node: '>=18'}
 
   '@paralleldrive/cuid2@2.3.1':
@@ -5863,7 +5863,7 @@ snapshots:
     dependencies:
       consola: 3.4.2
 
-  '@optisaas/opti-saas-lib@0.1.8': {}
+  '@optisaas/opti-saas-lib@0.1.9': {}
 
   '@paralleldrive/cuid2@2.3.1':
     dependencies:
