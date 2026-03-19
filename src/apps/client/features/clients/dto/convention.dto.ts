@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Max,
   Min,
   Validate,
   ValidationArguments,
@@ -49,6 +50,7 @@ export class ConventionDto {
   @ApiProperty({ example: 10.0 })
   @IsNumber()
   @Min(0)
+  @Max(100)
   @IsDefined()
   tauxRemise!: number;
 

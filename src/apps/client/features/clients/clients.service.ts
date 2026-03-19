@@ -213,11 +213,11 @@ export class ClientsService {
 
           if (dto.sponsorId) {
             const sponsor = await clientRepo.findOne({
-              where: { id: dto.sponsorId },
+              where: { id: dto.sponsorId, active: true },
             });
             if (!sponsor) {
               throw new NotFoundException(
-                `Sponsor with id ${dto.sponsorId} not found`,
+                `Active sponsor with id ${dto.sponsorId} not found`,
               );
             }
           }
@@ -691,10 +691,12 @@ export class ClientsService {
           }
 
           const clientRepo = manager.getRepository(ClClient);
-          await clientRepo.update(
-            { familyGroupId: id },
-            { familyGroupId: undefined },
-          );
+          await clientRepo
+            .createQueryBuilder()
+            .update(ClClient)
+            .set({ familyGroupId: () => 'NULL', familyLink: () => 'NULL' })
+            .where('familyGroupId = :id', { id })
+            .execute();
 
           await repo.remove(group);
           return { message: 'Family group deleted successfully' };

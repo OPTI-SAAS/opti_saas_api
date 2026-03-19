@@ -1,7 +1,11 @@
 import {
+  type Civilities,
   CivilitiesValues,
   CLIENT_TYPES,
+  type ClientType,
+  type FamilyLink,
   FamilyLinkValues,
+  type IdDocumentType,
   IdDocumentTypeValues,
 } from '@lib/shared/enums/client/client.client.enum';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -13,7 +17,7 @@ class ClientBaseResponseDto {
   id!: string;
 
   @ApiProperty()
-  type!: string;
+  type!: ClientType;
 
   @ApiPropertyOptional()
   phone?: string;
@@ -96,7 +100,7 @@ export class FamilyGroupMemberResponseDto {
   phone?: string;
 
   @ApiPropertyOptional({ enum: FamilyLinkValues })
-  familyLink?: string;
+  familyLink?: FamilyLink;
 }
 
 export class FamilyGroupResponseDto {
@@ -224,7 +228,7 @@ export class ClientParticulierResponseDto extends ClientBaseResponseDto {
   isMinor?: boolean;
 
   @ApiPropertyOptional({ enum: CivilitiesValues, example: 'Mr' })
-  title?: string;
+  title?: Civilities;
 
   @ApiPropertyOptional({ example: 'Benali' })
   lastName?: string;
@@ -254,7 +258,7 @@ export class ClientParticulierResponseDto extends ClientBaseResponseDto {
   spouseName?: string;
 
   @ApiPropertyOptional({ enum: IdDocumentTypeValues, example: 'CIN' })
-  idDocumentType?: string;
+  idDocumentType?: IdDocumentType;
 
   @ApiPropertyOptional({ example: 'AB123456' })
   idDocumentNumber?: string;
@@ -266,7 +270,7 @@ export class ClientParticulierResponseDto extends ClientBaseResponseDto {
   familyGroup?: FamilyGroupResponseDto;
 
   @ApiPropertyOptional({ enum: FamilyLinkValues, example: 'principal' })
-  familyLink?: string;
+  familyLink?: FamilyLink;
 
   @ApiPropertyOptional({ example: true })
   isOpticalBeneficiary?: boolean;

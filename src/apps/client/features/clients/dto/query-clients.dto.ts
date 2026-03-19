@@ -1,5 +1,8 @@
 import { PaginationQueryDto } from '@lib/shared/dto/pagination-query.dto';
-import { ClientTypeValues } from '@lib/shared/enums/client/client.client.enum';
+import {
+  type ClientType,
+  ClientTypeValues,
+} from '@lib/shared/enums/client/client.client.enum';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
@@ -15,7 +18,7 @@ export class QueryClientsDto extends PaginationQueryDto {
   @IsString()
   @IsEnum(ClientTypeValues)
   @IsOptional()
-  type?: string;
+  type?: ClientType;
 
   @ApiPropertyOptional({ default: true })
   @IsBoolean()

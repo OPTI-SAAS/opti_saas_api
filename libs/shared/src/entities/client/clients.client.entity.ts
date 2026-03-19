@@ -1,4 +1,10 @@
 import { BaseEntity } from '@lib/shared/base';
+import type {
+  Civilities,
+  ClientType,
+  FamilyLink,
+  IdDocumentType,
+} from '@lib/shared/enums/client/client.client.enum';
 import { CLIENT_GROUPS } from '@lib/shared/enums/client/client.client.enum';
 import { Exclude, Expose } from 'class-transformer';
 import {
@@ -43,7 +49,7 @@ export class ClClient extends BaseEntity {
 
   @Expose()
   @Column({ name: 'type', type: 'varchar' })
-  type!: string;
+  type!: ClientType;
 
   @Expose()
   @Column({ name: 'phone', type: 'varchar', nullable: true })
@@ -77,7 +83,7 @@ export class ClClient extends BaseEntity {
 
   @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
   @Column({ name: 'title', type: 'varchar', nullable: true })
-  title?: string;
+  title?: Civilities;
 
   @Expose({ groups: [CLIENT_GROUPS.PARTICULIER, CLIENT_GROUPS.PASSAGE] })
   @Column({ name: 'last_name', type: 'varchar', nullable: true })
@@ -105,7 +111,7 @@ export class ClClient extends BaseEntity {
 
   @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
   @Column({ name: 'id_document_type', type: 'varchar', nullable: true })
-  idDocumentType?: string;
+  idDocumentType?: IdDocumentType;
 
   @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
   @Column({ name: 'id_document_number', type: 'varchar', nullable: true })
@@ -117,7 +123,7 @@ export class ClClient extends BaseEntity {
 
   @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
   @Column({ name: 'family_link', type: 'varchar', nullable: true })
-  familyLink?: string;
+  familyLink?: FamilyLink;
 
   @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
   @Column({ name: 'is_optical_beneficiary', type: 'boolean', nullable: true })

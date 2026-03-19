@@ -1,8 +1,12 @@
 import {
+  type Civilities,
   CivilitiesValues,
   CLIENT_TYPES,
+  type ClientType,
   ClientTypeValues,
+  type FamilyLink,
   FamilyLinkValues,
+  type IdDocumentType,
   IdDocumentTypeValues,
 } from '@lib/shared/enums/client/client.client.enum';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -11,6 +15,7 @@ import {
   IsBoolean,
   IsDate,
   IsDefined,
+  IsEmail,
   IsEnum,
   IsObject,
   IsOptional,
@@ -26,7 +31,7 @@ export class CreateClientBaseDto {
   @IsString()
   @IsEnum(ClientTypeValues)
   @IsDefined()
-  type!: string;
+  type!: ClientType;
 
   // --- Shared base fields ---
 
@@ -36,7 +41,7 @@ export class CreateClientBaseDto {
   phone?: string;
 
   @ApiPropertyOptional({ example: 'client@example.com' })
-  @IsString()
+  @IsEmail({}, { message: 'email must be a valid email address' })
   @IsOptional()
   email?: string;
 
@@ -67,7 +72,7 @@ export class CreateClientBaseDto {
   @IsString()
   @IsEnum(CivilitiesValues)
   @IsDefined()
-  title?: string;
+  title?: Civilities;
 
   @ApiPropertyOptional({ example: 'Benali' })
   @ValidateIf(
@@ -105,7 +110,7 @@ export class CreateClientBaseDto {
   @IsString()
   @IsEnum(IdDocumentTypeValues)
   @IsOptional()
-  idDocumentType?: string;
+  idDocumentType?: IdDocumentType;
 
   @ApiPropertyOptional()
   @IsString()
@@ -116,7 +121,7 @@ export class CreateClientBaseDto {
   @IsString()
   @IsEnum(FamilyLinkValues)
   @IsOptional()
-  familyLink?: string;
+  familyLink?: FamilyLink;
 
   @ApiPropertyOptional()
   @IsBoolean()

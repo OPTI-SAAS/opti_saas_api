@@ -4,6 +4,7 @@ import {
   CLIENT_GROUPS,
   CLIENT_TYPES,
   FAMILY_LINKS,
+  type FamilyLink,
 } from '@lib/shared/enums/client/client.client.enum';
 import {
   BadRequestException,
@@ -39,16 +40,18 @@ export function toClientResponse(client: ClClient): Record<string, unknown> {
 export function toClientEntityPayload(
   dto: CreateClientDto | CreateTutorPayloadDto | UpdateClientDto,
 ): Partial<ClClient> {
+  // Extract and discard DTO-only fields that don't map to entity columns
+  const dtoRecord = dto as Record<string, unknown>;
   const {
     tutorPayload: _tp,
     useTutorFamily: _utf,
-    birthDate,
     convention: _conv,
     contacts: _cont,
+    birthDate,
     ...rest
-  } = dto as CreateClientDto;
+  } = dtoRecord;
   return {
-    ...rest,
+    ...(rest as Partial<ClClient>),
     ...(birthDate instanceof Date
       ? { birthDate: birthDate.toISOString().split('T')[0] }
       : {}),
@@ -71,16 +74,20 @@ export async function ensureIceUnique(
 }
 
 /**
- * Validates that the sponsor exists (simple referral link, no family logic).
+ * Validates that the sponsor exists and is active (simple referral link, no family logic).
  */
 export async function validateSponsor(
   clientRepo: Repository<ClClient>,
   sponsorId?: string,
 ): Promise<void> {
   if (!sponsorId) return;
-  const sponsor = await clientRepo.findOne({ where: { id: sponsorId } });
+  const sponsor = await clientRepo.findOne({
+    where: { id: sponsorId, active: true },
+  });
   if (!sponsor) {
-    throw new NotFoundException(`Sponsor with id ${sponsorId} not found`);
+    throw new NotFoundException(
+      `Active sponsor with id ${sponsorId} not found`,
+    );
   }
 }
 
@@ -134,7 +141,7 @@ export async function resolveFamilyGroup(
   familyGroupRepo: Repository<ClFamilyGroup>,
   dto: CreateClientDto,
   tutor: ClClient | null,
-): Promise<{ familyGroupId?: string; familyLink?: string }> {
+): Promise<{ familyGroupId?: string; familyLink?: FamilyLink }> {
   if (dto.familyGroupId) {
     const group = await familyGroupRepo.findOne({
       where: { id: dto.familyGroupId },

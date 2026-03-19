@@ -9,6 +9,11 @@ import { CreateClientBaseDto } from './create-client-base.dto';
 export class UpdateClientDto extends PartialType(
   OmitType(CreateClientBaseDto, ['type'] as const),
 ) {
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsUUID()
+  @IsOptional()
+  familyGroupId?: string;
+
   @IsUUID()
   @IsOptional()
   sponsorId?: string;

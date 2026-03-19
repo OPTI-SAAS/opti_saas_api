@@ -300,3 +300,42 @@ Task T041-T042  # Developer B: Update client details
 - All DTOs (T013–T017) can be created in parallel during foundational phase
 - Commit after each task or logical group
 - Stop at any checkpoint to validate story independently
+
+---
+
+## Evolution: Business Rules N1–N4 (Post-Initial Implementation)
+
+All 50 original tasks above are completed (✅). The following business rules were identified during code review and document refinements that evolved the original design:
+
+### N1 — Family Group Links
+
+Clients connect to a family group via `familyGroupId` (UUID FK to `family_groups` table) and a `familyLink` role: `principal`, `conjoint`, `tutor`, `parent`, `children`. Family groups are a full entity (`ClFamilyGroup`) with name, shared address (JSONB), and notes — no longer a simple integer label.
+
+### N2 — Family Search
+
+Users need to search family groups by: family address, participant phone number, participant first/last name. Returns a list of family groups with each family's participants.
+
+### N3 — Family Assignment on Client Creation
+
+1. If `familyId` is sent → assign client to that family group
+2. If `familyId` is empty AND `tutorId` is sent with tutor having `tutorFamily=true` → use the tutor's family group
+3. If `tutorPayload` is sent → create a new family group
+4. If client `isMinor` → create a new family group with the minor as `principal`
+
+### N4 — User Types (2-Type Model)
+
+- **Particulier**: `type='particulier'`, `passager=false`
+- **Passage**: `type='particulier'`, `passager=true`
+- **Professionnel**: `type='professionnel'`
+
+The DB CHECK constraint is `type IN ('particulier', 'professionnel')`. Passage is a serialization group, not a database type.
+
+### Code Review Fixes Applied
+
+- Entity and DTO field types aligned with `@optisaas/opti-saas-lib` types (`ClientType`, `Civilities`, `FamilyLink`)
+- Email fields validated with `@IsEmail()` (not just `@IsString()`)
+- Convention `tauxRemise` capped at `@Max(100)`
+- Sponsor validation checks `active: true` status
+- `deleteFamilyGroup` uses QueryBuilder to SET NULL (not `undefined`)
+- Added `isClientPassage` type guard (`type='particulier' && passager=true`)
+- Title values updated: `mrs`, `Mr`, `Autre` (from lib `Civilities` type)

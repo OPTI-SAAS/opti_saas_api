@@ -8,19 +8,20 @@
 ## Assumptions
 
 - This feature introduces a new "Clients" module in the client-facing application. It is a standalone bounded context with no dependencies on existing features (stock, products, suppliers).
-- The system supports three mutually exclusive client types distinguished by a `type` discriminator: **particulier** (individual), **passage** (walk-in), and **professionnel** (business). A client record belongs to exactly one type and the type cannot be changed after creation.
+- The system supports two mutually exclusive client types distinguished by a `type` discriminator: **particulier** (individual) and **professionnel** (business). A client record belongs to exactly one type and the type cannot be changed after creation.
 - **Particulier** clients have the richest data profile: personal identity, family group links, social coverage details, sponsorship, and a medical record.
-- **Passage** clients are minimal — lightweight records for one-time walk-in customers. Only last name and first name are optionally captured alongside shared base fields.
+- **Passage** (walk-in) clients are modeled as `type='particulier'` with `passager=true`. They are lightweight records — only last name and first name are optionally captured alongside shared base fields. The `passager` flag is immutable after creation.
 - **Professionnel** clients represent companies, carrying business identification fields (tax ID, ICE, commercial register), a VAT exemption flag, an optional convention (trade agreement), and zero or more internal contacts.
 - Medical records are stored as open-schema JSON. The system validates that the value is a valid JSON object but does **not** enforce a rigid set of fields. The consuming UI is responsible for field interpretation. This allows the medical form to evolve without back-end migrations.
 - Conventions and internal contacts for professional clients are separate entities with their own identity and lifecycle — they are **not** embedded as JSON inside the client record.
 - A convention belongs to exactly one professional client (one-to-one). Internal contacts belong to exactly one professional client (one-to-many).
-- The `sponsorId` on a particulier client is a self-referential link to another client. The sponsor must exist and be active.
-- Family groups are an optional grouping mechanism for particulier clients. A `familyGroupId` is an integer identifier that clusters related clients. Family group management (creation, listing members) is in scope.
+- The `sponsorId` on a particulier client is a self-referential link to another client. The sponsor must exist **and be active** at the time of assignment.
+- The `tutorId` on a particulier client is a self-referential link to another client acting as legal guardian for a minor. When `isMinor=true`, a tutor relationship is required.
+- Family groups are a separate entity (`family_groups` table) with their own CRUD lifecycle. A family group has a name (`nom`), an optional shared address (JSONB), and optional notes. Particulier clients link to a family group via `familyGroupId` (UUID FK) and declare their role via `familyLink` (principal, conjoint, tutor, parent, children). Family group management (create, list, get by ID, update, delete) is in scope.
 - `active` defaults to `true` on creation. Deleting a client soft-deactivates it (`active = false`) rather than physically removing the row.
 - Pagination is mandatory for all list endpoints. Filtering by type, name/company, phone, email, and active status is in scope.
 - All endpoints require authentication and tenant scoping per the existing project patterns.
-- Title values for particulier clients are constrained to a known set: Mr, Mme, Mlle.
+- Title values for particulier clients are constrained to a known set: `mrs`, `Mr`, `Autre` (sourced from `Civilities` type in `@optisaas/opti-saas-lib`).
 - ID document types are constrained to a known set: CIN, Passport, Carte de séjour. Additional types may be added later.
 
 ## User Scenarios & Testing _(mandatory)_
@@ -50,11 +51,11 @@ As an optician staff member, I want to quickly register a walk-in client (passag
 
 **Why this priority**: Walk-in registrations must be fast and frictionless. This is equally critical to P1 because many optical stores serve walk-in customers daily and the workflow must be instant.
 
-**Independent Test**: Can be fully tested by sending a create request with type `passage` and optionally lastName/firstName. Verify the client is persisted with minimal data and appears in the client list filtered by type `passage`.
+**Independent Test**: Can be fully tested by sending a create request with type `particulier` and `passager=true`, optionally with lastName/firstName. Verify the client is persisted with minimal data and appears in the client list when filtered for passage clients.
 
 **Acceptance Scenarios**:
 
-1. **Given** the user submits a creation request with only type `passage`, **When** the request is processed, **Then** the client is created with `active = true`, no name fields required, and an auto-generated ID.
+1. **Given** the user submits a creation request with type `particulier` and `passager=true`, **When** the request is processed, **Then** the client is created with `active = true`, `passager = true`, no name fields required, and an auto-generated ID.
 2. **Given** the user provides optional lastName and firstName, **When** the creation request is submitted, **Then** the client is created with those name fields saved.
 3. **Given** the user provides base fields (phone, email, city, address), **When** the creation request is submitted, **Then** all provided base fields are persisted.
 
@@ -173,9 +174,10 @@ As an optician staff member, I want to group individual clients into family grou
 
 **Acceptance Scenarios**:
 
-1. **Given** two individual clients with no family group, **When** the user assigns them both to family group `1` with appropriate family links (e.g., `époux`, `enfant`), **Then** both clients belong to the same group and a query for group `1` returns both members.
+1. **Given** a family group exists, **When** the user assigns two individual clients to that family group with appropriate family links (e.g., `principal`, `conjoint`), **Then** both clients belong to the same group and a query for the group returns both members.
 2. **Given** a client in a family group, **When** the user removes them from the group (sets familyGroupId to null), **Then** the client is no longer part of any family group.
-3. **Given** a family group exists, **When** one member has `hasSharedAddress = true`, **Then** the system indicates this member shares the address with the family group reference member.
+3. **Given** a family group exists, **When** one member has `hasSharedAddress = true`, **Then** the system indicates this member shares the address with the family group.
+4. **Given** a family group is deleted, **When** the deletion is processed, **Then** all member clients have their `familyGroupId` and `familyLink` set to NULL.
 
 ---
 
@@ -192,7 +194,7 @@ As an optician staff member, I want to group individual clients into family grou
 
 ### Functional Requirements
 
-- **FR-001**: System MUST support creating clients of three types: `particulier`, `passage`, and `professionnel`. The type is set at creation and is immutable.
+- **FR-001**: System MUST support creating clients of two types: `particulier` and `professionnel`. The type is set at creation and is immutable. Passage clients are modeled as `type='particulier'` with `passager=true`.
 - **FR-002**: System MUST validate required fields per client type — title, lastName, firstName, birthDate for particulier; companyName, taxId, ice, vatExempt for professionnel; no required type-specific fields for passage.
 - **FR-003**: System MUST store the medical record for particulier clients as an open-schema JSON object. The system validates the value is a valid JSON object but does not enforce specific fields within it.
 - **FR-004**: System MUST enforce ICE uniqueness per tenant for professional clients.
@@ -203,7 +205,10 @@ As an optician staff member, I want to group individual clients into family grou
 - **FR-009**: System MUST support soft-delete (deactivate) and reactivate operations. Default list queries return only active clients unless the `active` filter is explicitly set.
 - **FR-010**: System MUST validate that `sponsorId`, when provided, references an existing active client within the same tenant.
 - **FR-011**: System MUST support family group assignment for particulier clients, including querying all members of a given family group.
-- **FR-012**: System MUST constrain title to allowed values: Mr, Mme, Mlle.
+- **FR-012**: System MUST constrain title to allowed values: `mrs`, `Mr`, `Autre` (from `Civilities` type).
+- **FR-018**: System MUST validate email fields with proper email format validation (not just string validation).
+- **FR-019**: System MUST constrain `taux_remise` (discount rate) to a maximum of 100.
+- **FR-020**: System MUST constrain `familyLink` to allowed values: `principal`, `conjoint`, `tutor`, `parent`, `children` (from `FamilyLink` type).
 - **FR-013**: System MUST constrain idDocumentType to allowed values: CIN, Passport, Carte de séjour.
 - **FR-014**: System MUST enforce that convention date_fin is after date_debut when both are provided.
 - **FR-015**: System MUST default `active` to `true` on client creation.
@@ -215,7 +220,7 @@ As an optician staff member, I want to group individual clients into family grou
 - **Client**: The core entity representing any person or organization doing business with the optical store. Distinguished by a `type` discriminator (`particulier`, `passage`, `professionnel`). Holds shared base fields (phone, email, city, address, active) and type-specific fields. Belongs to exactly one tenant.
 - **Convention**: A trade agreement attached to a professional client (one-to-one). Contains commercial terms: agreement number, validity dates, discount rate, credit ceiling, payment delay, and notes.
 - **Internal Contact (ContactInterne)**: A person within a business client's organization (one-to-many from Client). Contains name, role, phone, email, and a principal flag.
-- **Family Group**: A logical grouping of individual (particulier) clients who are related. Identified by a shared `familyGroupId`. Members declare their family link and sharing preferences (mutual, address).
+- **Family Group**: A separate entity (`family_groups` table) grouping individual (particulier) clients who are related. Has a name, optional shared address (JSONB), and notes. Members link via `familyGroupId` (UUID FK) and declare their `familyLink` role (principal, conjoint, tutor, parent, children) and sharing preferences (mutual, address).
 
 ## Success Criteria _(mandatory)_
 

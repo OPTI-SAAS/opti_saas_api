@@ -57,6 +57,13 @@ export function isClientParticulier(client: { type: string }): boolean {
   return client.type === CLIENT_TYPES.PARTICULIER;
 }
 
+export function isClientPassage(client: {
+  type: string;
+  passager?: boolean;
+}): boolean {
+  return client.type === CLIENT_TYPES.PARTICULIER && client.passager === true;
+}
+
 export function isClientProfessionnel(client: { type: string }): boolean {
   return client.type === CLIENT_TYPES.PROFESSIONNEL;
 }
