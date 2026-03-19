@@ -1,5 +1,5 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { IsBoolean, IsDefined, IsString } from 'class-validator';
+import { IsBoolean, IsDefined, IsEmail, IsString } from 'class-validator';
 
 export class CreateContactInterneDto {
   @ApiProperty({ example: 'Alami' })
@@ -23,7 +23,7 @@ export class CreateContactInterneDto {
   telephone!: string;
 
   @ApiProperty({ example: 's.alami@company.ma' })
-  @IsString()
+  @IsEmail({}, { message: 'email must be a valid email address' })
   @IsDefined()
   email!: string;
 

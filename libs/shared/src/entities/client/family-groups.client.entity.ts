@@ -1,4 +1,5 @@
 import { BaseEntity } from '@lib/shared/base';
+import { TAddress } from '@lib/shared/types';
 import { Column, Entity, OneToMany } from 'typeorm';
 
 import type { ClClient } from './clients.client.entity';
@@ -7,6 +8,9 @@ import type { ClClient } from './clients.client.entity';
 export class ClFamilyGroup extends BaseEntity {
   @Column({ name: 'nom', type: 'varchar' })
   nom!: string;
+
+  @Column({ name: 'address', type: 'jsonb', nullable: true })
+  address?: TAddress;
 
   @Column({ name: 'notes', type: 'text', nullable: true })
   notes?: string;

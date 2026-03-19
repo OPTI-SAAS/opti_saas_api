@@ -64,22 +64,35 @@ specs/003-client-management/
 src/apps/client/features/clients/
 ├── index.ts
 ├── clients.controller.ts
+├── clients.helper.ts                     # utility functions (serialization, validation, entity mapping)
 ├── clients.module.ts
 ├── clients.service.ts
-└── dto/
-    ├── index.ts
-    ├── create-client.dto.ts
-    ├── update-client.dto.ts
-    └── query-clients.dto.ts
+├── dto/
+│   ├── index.ts
+│   ├── client-response.dto.ts            # all response DTOs (base, particulier, professionnel, family, convention, contact, pagination)
+│   ├── contact-interne.dto.ts
+│   ├── convention.dto.ts
+│   ├── create-client.dto.ts
+│   ├── create-client-base.dto.ts         # base creation DTO with conditional validation per type
+│   ├── create-sponsor-payload.dto.ts
+│   ├── create-tutor-payload.dto.ts
+│   ├── family-group.dto.ts
+│   ├── query-clients.dto.ts
+│   ├── query-family-groups.dto.ts
+│   ├── query-family-search.dto.ts        # family search by address/phone/name (dead code — not wired to controller)
+│   └── update-client.dto.ts
+└── pipes/
+    └── create-client-validation.pipe.ts  # custom validation pipe for type-conditional fields
 
 libs/shared/src/entities/client/
 ├── clients.client.entity.ts
 ├── conventions.client.entity.ts
 ├── contacts-internes.client.entity.ts
+├── family-groups.client.entity.ts        # ClFamilyGroup entity (nom, address JSONB, notes, members)
 └── index.ts                              # updated with new exports
 
 libs/shared/src/enums/client/
-└── client.client.enum.ts
+└── client.client.enum.ts                 # types re-exported from @optisaas/opti-saas-lib + local constants/type guards
 
 libs/shared/src/migrations/client/
 └── <timestamp>-create-clients-conventions-contacts-internes.ts

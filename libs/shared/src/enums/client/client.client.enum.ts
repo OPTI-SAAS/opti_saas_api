@@ -1,19 +1,44 @@
 import { ExtractEnumTypes } from '@lib/shared/helpers';
+import {
+  type Civilities,
+  civilitiesValues,
+  type ClientType,
+  clientTypeValues,
+  type FamilyLink,
+  familyLinkValues,
+} from '@optisaas/opti-saas-lib';
+
+export type { Civilities, ClientType, FamilyLink };
+
+export const ClientTypeValues = clientTypeValues;
+export const FamilyLinkValues = familyLinkValues;
 
 export const CLIENT_TYPES = {
   PARTICULIER: 'particulier',
-  PASSAGE: 'passage',
   PROFESSIONNEL: 'professionnel',
+} as const satisfies Record<string, ClientType>;
+
+export const CLIENT_GROUPS = {
+  PARTICULIER: 'particulier',
+  PROFESSIONNEL: 'professionnel',
+  PASSAGE: 'passage',
 } as const;
 
-export const ClientTypeValues = Object.values(CLIENT_TYPES);
-export type ClientType = ExtractEnumTypes<typeof CLIENT_TYPES>;
+export const FAMILY_LINKS = {
+  PRINCIPAL: 'principal',
+  CONJOINT: 'conjoint',
+  TUTOR: 'tutor',
+  PARENT: 'parent',
+  CHILDREN: 'children',
+} as const satisfies Record<string, FamilyLink>;
+
+export const CivilitiesValues = civilitiesValues;
 
 export const CLIENT_TITLES = {
+  MRS: 'mrs',
   MR: 'Mr',
-  MME: 'Mme',
-  MLLE: 'Mlle',
-} as const;
+  AUTRE: 'Autre',
+} as const satisfies Record<string, Civilities>;
 
 export const ClientTitleValues = Object.values(CLIENT_TITLES);
 export type ClientTitle = ExtractEnumTypes<typeof CLIENT_TITLES>;
@@ -32,8 +57,11 @@ export function isClientParticulier(client: { type: string }): boolean {
   return client.type === CLIENT_TYPES.PARTICULIER;
 }
 
-export function isClientPassage(client: { type: string }): boolean {
-  return client.type === CLIENT_TYPES.PASSAGE;
+export function isClientPassage(client: {
+  type: string;
+  passager?: boolean;
+}): boolean {
+  return client.type === CLIENT_TYPES.PARTICULIER && client.passager === true;
 }
 
 export function isClientProfessionnel(client: { type: string }): boolean {
