@@ -19,9 +19,9 @@ import {
   Unique,
 } from 'typeorm';
 
-import type { ClContactInterne } from './contacts-internes.client.entity';
-import type { ClConvention } from './conventions.client.entity';
-import type { ClFamilyGroup } from './family-groups.client.entity';
+import { ClContactInterne } from './contacts-internes.client.entity';
+import { ClConvention } from './conventions.client.entity';
+import { ClFamilyGroup } from './family-groups.client.entity';
 
 @Exclude()
 @Entity('clients')
@@ -209,7 +209,7 @@ export class ClClient extends BaseEntity {
   tutor?: ClClient;
 
   @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
-  @ManyToOne('ClFamilyGroup', 'members', {
+  @ManyToOne(() => ClFamilyGroup, (fg) => fg.members, {
     nullable: true,
     onDelete: 'SET NULL',
   })
@@ -217,10 +217,10 @@ export class ClClient extends BaseEntity {
   familyGroup?: ClFamilyGroup;
 
   @Expose({ groups: [CLIENT_GROUPS.PROFESSIONAL] })
-  @OneToOne('ClConvention', 'client')
+  @OneToOne(() => ClConvention, (conv) => conv.client)
   convention?: ClConvention;
 
   @Expose({ groups: [CLIENT_GROUPS.PROFESSIONAL] })
-  @OneToMany('ClContactInterne', 'client')
+  @OneToMany(() => ClContactInterne, (contact) => contact.client)
   contactsInternes?: ClContactInterne[];
 }

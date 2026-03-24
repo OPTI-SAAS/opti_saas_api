@@ -2,7 +2,7 @@ import { BaseEntity } from '@lib/shared/base';
 import { TAddress } from '@lib/shared/types';
 import { Column, Entity, OneToMany } from 'typeorm';
 
-import type { ClClient } from './clients.client.entity';
+import { ClClient } from './clients.client.entity';
 
 @Entity('family_groups')
 export class ClFamilyGroup extends BaseEntity {
@@ -17,6 +17,6 @@ export class ClFamilyGroup extends BaseEntity {
 
   // --- Relationships ---
 
-  @OneToMany('ClClient', 'familyGroup')
+  @OneToMany(() => ClClient, (client) => client.familyGroup)
   members?: ClClient[];
 }
