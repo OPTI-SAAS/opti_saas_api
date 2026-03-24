@@ -26,7 +26,7 @@ import {
 export class CreateClientBaseDto {
   @ApiProperty({
     enum: ClientTypeValues,
-    example: CLIENT_TYPES.PARTICULIER,
+    example: CLIENT_TYPES.INDIVIDUAL,
   })
   @IsString()
   @IsEnum(ClientTypeValues)
@@ -58,7 +58,7 @@ export class CreateClientBaseDto {
   @ApiPropertyOptional({ example: false })
   @IsBoolean()
   @IsOptional()
-  passager?: boolean;
+  walkIn?: boolean;
 
   @ApiPropertyOptional({ example: false })
   @IsBoolean()
@@ -68,7 +68,7 @@ export class CreateClientBaseDto {
   // --- Particulier-specific fields (required when type = particulier) ---
 
   @ApiPropertyOptional({ enum: CivilitiesValues, example: 'Mr' })
-  @ValidateIf((o) => o.type === CLIENT_TYPES.PARTICULIER && !o.passager)
+  @ValidateIf((o) => o.type === CLIENT_TYPES.INDIVIDUAL && !o.walkIn)
   @IsString()
   @IsEnum(CivilitiesValues)
   @IsDefined()
@@ -77,7 +77,7 @@ export class CreateClientBaseDto {
   @ApiPropertyOptional({ example: 'Benali' })
   @ValidateIf(
     (o) =>
-      (o.type === CLIENT_TYPES.PARTICULIER && !o.passager) ||
+      (o.type === CLIENT_TYPES.INDIVIDUAL && !o.walkIn) ||
       o.lastName !== undefined,
   )
   @IsString()
@@ -87,7 +87,7 @@ export class CreateClientBaseDto {
   @ApiPropertyOptional({ example: 'Youssef' })
   @ValidateIf(
     (o) =>
-      (o.type === CLIENT_TYPES.PARTICULIER && !o.passager) ||
+      (o.type === CLIENT_TYPES.INDIVIDUAL && !o.walkIn) ||
       o.firstName !== undefined,
   )
   @IsString()
@@ -95,7 +95,7 @@ export class CreateClientBaseDto {
   firstName?: string;
 
   @ApiPropertyOptional({ example: '1990-05-15' })
-  @ValidateIf((o) => o.type === CLIENT_TYPES.PARTICULIER && !o.passager)
+  @ValidateIf((o) => o.type === CLIENT_TYPES.INDIVIDUAL && !o.walkIn)
   @Type(() => Date)
   @IsDate()
   @IsDefined()
@@ -175,19 +175,19 @@ export class CreateClientBaseDto {
   // --- Professionnel-specific fields (required when type = professionnel) ---
 
   @ApiPropertyOptional({ example: 'OptikVision SARL' })
-  @ValidateIf((o) => o.type === CLIENT_TYPES.PROFESSIONNEL)
+  @ValidateIf((o) => o.type === CLIENT_TYPES.PROFESSIONAL)
   @IsString()
   @IsDefined()
   companyName?: string;
 
   @ApiPropertyOptional({ example: '12345678' })
-  @ValidateIf((o) => o.type === CLIENT_TYPES.PROFESSIONNEL)
+  @ValidateIf((o) => o.type === CLIENT_TYPES.PROFESSIONAL)
   @IsString()
   @IsDefined()
   taxId?: string;
 
   @ApiPropertyOptional({ example: '001234567000012' })
-  @ValidateIf((o) => o.type === CLIENT_TYPES.PROFESSIONNEL)
+  @ValidateIf((o) => o.type === CLIENT_TYPES.PROFESSIONAL)
   @IsString()
   @IsDefined()
   ice?: string;
@@ -203,7 +203,7 @@ export class CreateClientBaseDto {
   tradeLicense?: string;
 
   @ApiPropertyOptional()
-  @ValidateIf((o) => o.type === CLIENT_TYPES.PROFESSIONNEL)
+  @ValidateIf((o) => o.type === CLIENT_TYPES.PROFESSIONAL)
   @IsBoolean()
   @IsDefined()
   vatExempt?: boolean;

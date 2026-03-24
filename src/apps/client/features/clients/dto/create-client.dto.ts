@@ -86,16 +86,16 @@ export class CreateParticulierClientDto extends OmitType(CreateClientDto, [
   'vatExempt',
 ] as const) {
   @ApiProperty({
-    enum: [CLIENT_TYPES.PARTICULIER],
-    example: CLIENT_TYPES.PARTICULIER,
+    enum: [CLIENT_TYPES.INDIVIDUAL],
+    example: CLIENT_TYPES.INDIVIDUAL,
   })
   @IsString()
   @IsDefined()
-  type!: typeof CLIENT_TYPES.PARTICULIER;
+  type!: typeof CLIENT_TYPES.INDIVIDUAL;
 }
 
 export class CreateProfessionnelClientDto extends OmitType(CreateClientDto, [
-  'passager',
+  'walkIn',
   'isMinor',
   'title',
   'lastName',
@@ -120,10 +120,10 @@ export class CreateProfessionnelClientDto extends OmitType(CreateClientDto, [
   'familyGroupId',
 ] as const) {
   @ApiProperty({
-    enum: [CLIENT_TYPES.PROFESSIONNEL],
-    example: CLIENT_TYPES.PROFESSIONNEL,
+    enum: [CLIENT_TYPES.PROFESSIONAL],
+    example: CLIENT_TYPES.PROFESSIONAL,
   })
   @IsString()
   @IsDefined()
-  type!: typeof CLIENT_TYPES.PROFESSIONNEL;
+  type!: typeof CLIENT_TYPES.PROFESSIONAL;
 }

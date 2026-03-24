@@ -15,16 +15,16 @@ import {
   ValidatorConstraintInterface,
 } from 'class-validator';
 
-@ValidatorConstraint({ name: 'dateFinAfterDebut', async: false })
-class DateFinAfterDebutConstraint implements ValidatorConstraintInterface {
+@ValidatorConstraint({ name: 'endDateAfterStartDate', async: false })
+class EndDateAfterStartDateConstraint implements ValidatorConstraintInterface {
   validate(_value: unknown, args: ValidationArguments) {
     const obj = args.object as ConventionDto;
-    if (!obj.dateFin || !obj.dateDebut) return true;
-    return new Date(obj.dateFin) > new Date(obj.dateDebut);
+    if (!obj.endDate || !obj.startDate) return true;
+    return new Date(obj.endDate) > new Date(obj.startDate);
   }
 
   defaultMessage() {
-    return 'dateFin must be after dateDebut';
+    return 'endDate must be after startDate';
   }
 }
 
@@ -32,39 +32,39 @@ export class ConventionDto {
   @ApiProperty({ example: 'CONV-2026-001' })
   @IsString()
   @IsDefined()
-  numero!: string;
+  number!: string;
 
   @ApiPropertyOptional({ example: '2026-01-01' })
   @Type(() => Date)
   @IsDate()
   @IsOptional()
-  dateDebut?: Date;
+  startDate?: Date;
 
   @ApiPropertyOptional({ example: '2026-12-31' })
   @Type(() => Date)
   @IsDate()
   @IsOptional()
-  @Validate(DateFinAfterDebutConstraint)
-  dateFin?: Date;
+  @Validate(EndDateAfterStartDateConstraint)
+  endDate?: Date;
 
   @ApiProperty({ example: 10.0 })
   @IsNumber()
   @Min(0)
   @Max(100)
   @IsDefined()
-  tauxRemise!: number;
+  discountRate!: number;
 
   @ApiProperty({ example: 50000 })
   @IsNumber()
   @Min(0)
   @IsDefined()
-  plafondCredit!: number;
+  creditLimit!: number;
 
   @ApiProperty({ example: 30 })
   @IsInt()
   @Min(0)
   @IsDefined()
-  delaiPaiement!: number;
+  paymentDelay!: number;
 
   @ApiPropertyOptional()
   @IsString()

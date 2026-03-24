@@ -13,7 +13,7 @@ export class CreateFamilyGroupDto {
   @ApiProperty({ example: 'Famille Benali' })
   @IsString()
   @IsDefined()
-  nom!: string;
+  name!: string;
 
   @ApiPropertyOptional({ type: () => CreateAddressDto })
   @IsOptional()

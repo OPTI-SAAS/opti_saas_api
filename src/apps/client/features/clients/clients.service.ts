@@ -49,7 +49,7 @@ export class ClientsService {
           const clientRepo = manager.getRepository(ClClient);
           const familyGroupRepo = manager.getRepository(ClFamilyGroup);
 
-          if (dto.type === CLIENT_TYPES.PROFESSIONNEL && dto.ice) {
+          if (dto.type === CLIENT_TYPES.PROFESSIONAL && dto.ice) {
             await ensureIceUnique(clientRepo, dto.ice);
           }
 
@@ -76,23 +76,23 @@ export class ClientsService {
           const saved = await clientRepo.save(client);
 
           // Handle nested convention for professionnel clients
-          if (dto.convention && dto.type === CLIENT_TYPES.PROFESSIONNEL) {
+          if (dto.convention && dto.type === CLIENT_TYPES.PROFESSIONAL) {
             const conventionRepo = manager.getRepository(ClConvention);
             const convention = conventionRepo.create({
               ...dto.convention,
               clientId: saved.id,
-              dateDebut: dto.convention.dateDebut
-                ? new Date(dto.convention.dateDebut).toISOString().split('T')[0]
+              startDate: dto.convention.startDate
+                ? new Date(dto.convention.startDate).toISOString().split('T')[0]
                 : undefined,
-              dateFin: dto.convention.dateFin
-                ? new Date(dto.convention.dateFin).toISOString().split('T')[0]
+              endDate: dto.convention.endDate
+                ? new Date(dto.convention.endDate).toISOString().split('T')[0]
                 : undefined,
             });
             saved.convention = await conventionRepo.save(convention);
           }
 
           // Handle nested contacts for professionnel clients
-          if (dto.contacts?.length && dto.type === CLIENT_TYPES.PROFESSIONNEL) {
+          if (dto.contacts?.length && dto.type === CLIENT_TYPES.PROFESSIONAL) {
             const contactRepo = manager.getRepository(ClContactInterne);
             const contacts = dto.contacts.map((c) =>
               contactRepo.create({ ...c, clientId: saved.id }),
@@ -250,11 +250,11 @@ export class ClientsService {
             const conventionData: Partial<ClConvention> = {
               ...dto.convention,
               clientId: id,
-              dateDebut: dto.convention.dateDebut
-                ? new Date(dto.convention.dateDebut).toISOString().split('T')[0]
+              startDate: dto.convention.startDate
+                ? new Date(dto.convention.startDate).toISOString().split('T')[0]
                 : undefined,
-              dateFin: dto.convention.dateFin
-                ? new Date(dto.convention.dateFin).toISOString().split('T')[0]
+              endDate: dto.convention.endDate
+                ? new Date(dto.convention.endDate).toISOString().split('T')[0]
                 : undefined,
             };
 
@@ -362,11 +362,11 @@ export class ClientsService {
           const conventionData: Partial<ClConvention> = {
             ...dto,
             clientId,
-            dateDebut: dto.dateDebut
-              ? dto.dateDebut.toISOString().split('T')[0]
+            startDate: dto.startDate
+              ? dto.startDate.toISOString().split('T')[0]
               : undefined,
-            dateFin: dto.dateFin
-              ? dto.dateFin.toISOString().split('T')[0]
+            endDate: dto.endDate
+              ? dto.endDate.toISOString().split('T')[0]
               : undefined,
           };
 
@@ -440,10 +440,10 @@ export class ClientsService {
             );
           }
 
-          if (dto.principal) {
+          if (dto.isPrincipal) {
             await contactRepo.update(
-              { clientId, principal: true },
-              { principal: false },
+              { clientId, isPrincipal: true },
+              { isPrincipal: false },
             );
           }
 
@@ -476,10 +476,10 @@ export class ClientsService {
             );
           }
 
-          if (dto.principal === true) {
+          if (dto.isPrincipal === true) {
             await contactRepo.update(
-              { clientId, principal: true },
-              { principal: false },
+              { clientId, isPrincipal: true },
+              { isPrincipal: false },
             );
           }
 
@@ -534,7 +534,7 @@ export class ClientsService {
 
           return await contactRepo.find({
             where: { clientId },
-            order: { principal: 'DESC', createdAt: 'DESC' },
+            order: { isPrincipal: 'DESC', createdAt: 'DESC' },
           });
         },
       );
@@ -570,8 +570,8 @@ export class ClientsService {
             .createQueryBuilder('fg')
             .leftJoinAndSelect('fg.members', 'member');
 
-          if (query.nom) {
-            qb.andWhere('fg.nom ILIKE :nom', { nom: `%${query.nom}%` });
+          if (query.name) {
+            qb.andWhere('fg.name ILIKE :name', { name: `%${query.name}%` });
           }
 
           if (query.address) {

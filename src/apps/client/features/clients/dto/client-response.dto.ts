@@ -108,7 +108,7 @@ export class FamilyGroupResponseDto {
   id!: string;
 
   @ApiProperty({ example: 'Famille Benali' })
-  nom!: string;
+  name!: string;
 
   @ApiPropertyOptional({ type: 'object', additionalProperties: true })
   address?: Record<string, unknown>;
@@ -144,22 +144,22 @@ export class ConventionResponseDto {
   clientId!: string;
 
   @ApiProperty({ example: 'CONV-2026-001' })
-  numero!: string;
+  number!: string;
 
   @ApiPropertyOptional({ example: '2026-01-01' })
-  dateDebut?: string;
+  startDate?: string;
 
   @ApiPropertyOptional({ example: '2026-12-31' })
-  dateFin?: string;
+  endDate?: string;
 
   @ApiProperty({ example: 10.0 })
-  tauxRemise!: number;
+  discountRate!: number;
 
   @ApiProperty({ example: 50000 })
-  plafondCredit!: number;
+  creditLimit!: number;
 
   @ApiProperty({ example: 30 })
-  delaiPaiement!: number;
+  paymentDelay!: number;
 
   @ApiPropertyOptional()
   notes?: string;
@@ -181,22 +181,22 @@ export class ContactInterneResponseDto {
   clientId!: string;
 
   @ApiProperty({ example: 'Alami' })
-  nom!: string;
+  lastName!: string;
 
   @ApiProperty({ example: 'Sara' })
-  prenom!: string;
+  firstName!: string;
 
   @ApiProperty({ example: 'Responsable RH' })
-  fonction!: string;
+  position!: string;
 
   @ApiProperty({ example: '0612345678' })
-  telephone!: string;
+  phone!: string;
 
   @ApiProperty({ example: 's.alami@company.ma' })
   email!: string;
 
   @ApiProperty({ example: true })
-  principal!: boolean;
+  isPrincipal!: boolean;
 
   @ApiProperty()
   createdAt!: Date;
@@ -215,14 +215,14 @@ export class MessageResponseDto {
 // ── Particulier ──
 
 export class ClientParticulierResponseDto extends ClientBaseResponseDto {
-  @ApiProperty({ enum: [CLIENT_TYPES.PARTICULIER], example: 'particulier' })
-  type!: typeof CLIENT_TYPES.PARTICULIER;
+  @ApiProperty({ enum: [CLIENT_TYPES.INDIVIDUAL], example: 'particulier' })
+  type!: typeof CLIENT_TYPES.INDIVIDUAL;
 
   @ApiProperty({
     example: false,
     description: 'true for walk-in (passage) clients',
   })
-  passager?: boolean;
+  walkIn?: boolean;
 
   @ApiProperty({ example: false, description: 'true if client is a minor' })
   isMinor?: boolean;
@@ -309,8 +309,8 @@ export class ClientParticulierResponseDto extends ClientBaseResponseDto {
 // ── Professionnel ──
 
 export class ClientProfessionnelResponseDto extends ClientBaseResponseDto {
-  @ApiProperty({ enum: [CLIENT_TYPES.PROFESSIONNEL], example: 'professionnel' })
-  type!: typeof CLIENT_TYPES.PROFESSIONNEL;
+  @ApiProperty({ enum: [CLIENT_TYPES.PROFESSIONAL], example: 'professionnel' })
+  type!: typeof CLIENT_TYPES.PROFESSIONAL;
 
   @ApiProperty({ example: 'OptikVision SARL' })
   companyName?: string;

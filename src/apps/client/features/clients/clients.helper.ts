@@ -24,11 +24,11 @@ import type { UpdateClientDto } from './dto/update-client.dto';
  */
 export function toClientResponse(client: ClClient): Record<string, unknown> {
   const group =
-    client.type === CLIENT_TYPES.PROFESSIONNEL
-      ? CLIENT_GROUPS.PROFESSIONNEL
-      : client.passager
-        ? CLIENT_GROUPS.PASSAGE
-        : CLIENT_GROUPS.PARTICULIER;
+    client.type === CLIENT_TYPES.PROFESSIONAL
+      ? CLIENT_GROUPS.PROFESSIONAL
+      : client.walkIn
+        ? CLIENT_GROUPS.WALK_IN
+        : CLIENT_GROUPS.INDIVIDUAL;
   return instanceToPlain(client, { groups: [group] });
 }
 
@@ -113,7 +113,7 @@ export async function resolveTutor(
 
   if (dto.tutorPayload) {
     if (
-      dto.tutorPayload.type === CLIENT_TYPES.PROFESSIONNEL &&
+      dto.tutorPayload.type === CLIENT_TYPES.PROFESSIONAL &&
       dto.tutorPayload.ice
     ) {
       await ensureIceUnique(clientRepo, dto.tutorPayload.ice);
@@ -168,7 +168,7 @@ export async function resolveFamilyGroup(
 
   if (dto.tutorPayload && tutor) {
     const familyName = tutor.lastName ?? tutor.companyName ?? 'Famille';
-    const group = familyGroupRepo.create({ nom: familyName });
+    const group = familyGroupRepo.create({ name: familyName });
     const saved = await familyGroupRepo.save(group);
 
     tutor.familyGroupId = saved.id;
@@ -180,7 +180,7 @@ export async function resolveFamilyGroup(
 
   if (dto.isMinor && !dto.familyGroupId) {
     const familyName = dto.lastName ?? 'Famille';
-    const group = familyGroupRepo.create({ nom: familyName });
+    const group = familyGroupRepo.create({ name: familyName });
     const saved = await familyGroupRepo.save(group);
 
     return { familyGroupId: saved.id, familyLink: FAMILY_LINKS.PRINCIPAL };
@@ -189,7 +189,7 @@ export async function resolveFamilyGroup(
   // Auto-create family group when a principal has no familyGroupId
   if (dto.familyLink === FAMILY_LINKS.PRINCIPAL && !dto.familyGroupId) {
     const familyName = dto.lastName ?? dto.companyName ?? 'Famille';
-    const group = familyGroupRepo.create({ nom: familyName });
+    const group = familyGroupRepo.create({ name: familyName });
     const saved = await familyGroupRepo.save(group);
 
     return { familyGroupId: saved.id, familyLink: FAMILY_LINKS.PRINCIPAL };

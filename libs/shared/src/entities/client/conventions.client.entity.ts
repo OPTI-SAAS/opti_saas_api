@@ -7,41 +7,41 @@ import { ClClient } from './clients.client.entity';
 @Unique('UQ_conventions_client_id', ['clientId'])
 @Check(
   'CHK_conventions_dates',
-  'date_fin IS NULL OR date_debut IS NULL OR date_fin > date_debut',
+  'end_date IS NULL OR start_date IS NULL OR end_date > start_date',
 )
 export class ClConvention extends BaseEntity {
   @Column({ name: 'client_id', type: 'uuid' })
   clientId!: string;
 
-  @Column({ name: 'numero', type: 'varchar' })
-  numero!: string;
+  @Column({ name: 'number', type: 'varchar' })
+  number!: string;
 
-  @Column({ name: 'date_debut', type: 'date', nullable: true })
-  dateDebut?: string;
+  @Column({ name: 'start_date', type: 'date', nullable: true })
+  startDate?: string;
 
-  @Column({ name: 'date_fin', type: 'date', nullable: true })
-  dateFin?: string;
+  @Column({ name: 'end_date', type: 'date', nullable: true })
+  endDate?: string;
 
   @Column({
-    name: 'taux_remise',
+    name: 'discount_rate',
     type: 'decimal',
     precision: 5,
     scale: 2,
     default: 0,
   })
-  tauxRemise!: number;
+  discountRate!: number;
 
   @Column({
-    name: 'plafond_credit',
+    name: 'credit_limit',
     type: 'decimal',
     precision: 12,
     scale: 2,
     default: 0,
   })
-  plafondCredit!: number;
+  creditLimit!: number;
 
-  @Column({ name: 'delai_paiement', type: 'int', default: 0 })
-  delaiPaiement!: number;
+  @Column({ name: 'payment_delay', type: 'int', default: 0 })
+  paymentDelay!: number;
 
   @Column({ name: 'notes', type: 'text', nullable: true })
   notes?: string;

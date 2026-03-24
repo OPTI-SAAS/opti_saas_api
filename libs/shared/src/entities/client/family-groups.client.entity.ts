@@ -6,8 +6,8 @@ import type { ClClient } from './clients.client.entity';
 
 @Entity('family_groups')
 export class ClFamilyGroup extends BaseEntity {
-  @Column({ name: 'nom', type: 'varchar' })
-  nom!: string;
+  @Column({ name: 'name', type: 'varchar' })
+  name!: string;
 
   @Column({ name: 'address', type: 'jsonb', nullable: true })
   address?: TAddress;

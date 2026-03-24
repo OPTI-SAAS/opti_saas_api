@@ -14,19 +14,19 @@ export const ClientTypeValues = clientTypeValues;
 export const FamilyLinkValues = familyLinkValues;
 
 export const CLIENT_TYPES = {
-  PARTICULIER: 'particulier',
-  PROFESSIONNEL: 'professionnel',
+  INDIVIDUAL: 'particulier',
+  PROFESSIONAL: 'professionnel',
 } as const satisfies Record<string, ClientType>;
 
 export const CLIENT_GROUPS = {
-  PARTICULIER: 'particulier',
-  PROFESSIONNEL: 'professionnel',
-  PASSAGE: 'passage',
+  INDIVIDUAL: 'particulier',
+  PROFESSIONAL: 'professionnel',
+  WALK_IN: 'passage',
 } as const;
 
 export const FAMILY_LINKS = {
   PRINCIPAL: 'principal',
-  CONJOINT: 'conjoint',
+  SPOUSE: 'conjoint',
   TUTOR: 'tutor',
   PARENT: 'parent',
   CHILDREN: 'children',
@@ -37,7 +37,7 @@ export const CivilitiesValues = civilitiesValues;
 export const CLIENT_TITLES = {
   MRS: 'mrs',
   MR: 'Mr',
-  AUTRE: 'Autre',
+  OTHER: 'Autre',
 } as const satisfies Record<string, Civilities>;
 
 export const ClientTitleValues = Object.values(CLIENT_TITLES);
@@ -46,7 +46,7 @@ export type ClientTitle = ExtractEnumTypes<typeof CLIENT_TITLES>;
 export const ID_DOCUMENT_TYPES = {
   CIN: 'CIN',
   PASSPORT: 'Passport',
-  CARTE_DE_SEJOUR: 'Carte de séjour',
+  RESIDENCE_PERMIT: 'Carte de séjour',
 } as const;
 
 export const IdDocumentTypeValues = Object.values(ID_DOCUMENT_TYPES);
@@ -54,16 +54,16 @@ export type IdDocumentType = ExtractEnumTypes<typeof ID_DOCUMENT_TYPES>;
 
 // Type guards
 export function isClientParticulier(client: { type: string }): boolean {
-  return client.type === CLIENT_TYPES.PARTICULIER;
+  return client.type === CLIENT_TYPES.INDIVIDUAL;
 }
 
 export function isClientPassage(client: {
   type: string;
-  passager?: boolean;
+  walkIn?: boolean;
 }): boolean {
-  return client.type === CLIENT_TYPES.PARTICULIER && client.passager === true;
+  return client.type === CLIENT_TYPES.INDIVIDUAL && client.walkIn === true;
 }
 
 export function isClientProfessionnel(client: { type: string }): boolean {
-  return client.type === CLIENT_TYPES.PROFESSIONNEL;
+  return client.type === CLIENT_TYPES.PROFESSIONAL;
 }

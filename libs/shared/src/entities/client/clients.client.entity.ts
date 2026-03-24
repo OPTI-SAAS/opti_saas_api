@@ -73,63 +73,63 @@ export class ClClient extends BaseEntity {
 
   // --- Particulier-specific fields ---
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER, CLIENT_GROUPS.PASSAGE] })
-  @Column({ name: 'passager', type: 'boolean', default: false, nullable: true })
-  passager?: boolean;
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL, CLIENT_GROUPS.WALK_IN] })
+  @Column({ name: 'walk_in', type: 'boolean', default: false, nullable: true })
+  walkIn?: boolean;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({ name: 'is_minor', type: 'boolean', default: false, nullable: true })
   isMinor?: boolean;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({ name: 'title', type: 'varchar', nullable: true })
   title?: Civilities;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER, CLIENT_GROUPS.PASSAGE] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL, CLIENT_GROUPS.WALK_IN] })
   @Column({ name: 'last_name', type: 'varchar', nullable: true })
   lastName?: string;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER, CLIENT_GROUPS.PASSAGE] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL, CLIENT_GROUPS.WALK_IN] })
   @Column({ name: 'first_name', type: 'varchar', nullable: true })
   firstName?: string;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({ name: 'birth_date', type: 'date', nullable: true })
   birthDate?: string;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({ name: 'sponsor_id', type: 'uuid', nullable: true })
   sponsorId?: string;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({ name: 'tutor_id', type: 'uuid', nullable: true })
   tutorId?: string;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({ name: 'spouse_name', type: 'varchar', nullable: true })
   spouseName?: string;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({ name: 'id_document_type', type: 'varchar', nullable: true })
   idDocumentType?: IdDocumentType;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({ name: 'id_document_number', type: 'varchar', nullable: true })
   idDocumentNumber?: string;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({ name: 'family_group_id', type: 'uuid', nullable: true })
   familyGroupId?: string;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({ name: 'family_link', type: 'varchar', nullable: true })
   familyLink?: FamilyLink;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({ name: 'is_optical_beneficiary', type: 'boolean', nullable: true })
   isOpticalBeneficiary?: boolean;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({
     name: 'is_financial_responsible',
     type: 'boolean',
@@ -137,27 +137,27 @@ export class ClClient extends BaseEntity {
   })
   isFinancialResponsible?: boolean;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({ name: 'has_shared_mutual', type: 'boolean', nullable: true })
   hasSharedMutual?: boolean;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({ name: 'has_shared_address', type: 'boolean', nullable: true })
   hasSharedAddress?: boolean;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({ name: 'has_social_coverage', type: 'boolean', nullable: true })
   hasSocialCoverage?: boolean;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({ name: 'coverage_type', type: 'varchar', nullable: true })
   coverageType?: string;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({ name: 'membership_number', type: 'varchar', nullable: true })
   membershipNumber?: string;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({
     name: 'medical_record',
     type: 'jsonb',
@@ -166,49 +166,49 @@ export class ClClient extends BaseEntity {
   })
   medicalRecord!: Record<string, unknown>;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @Column({ name: 'notes', type: 'text', nullable: true })
   notes?: string;
 
   // --- Professionnel-specific fields ---
 
-  @Expose({ groups: [CLIENT_GROUPS.PROFESSIONNEL] })
+  @Expose({ groups: [CLIENT_GROUPS.PROFESSIONAL] })
   @Column({ name: 'company_name', type: 'varchar', nullable: true })
   companyName?: string;
 
-  @Expose({ groups: [CLIENT_GROUPS.PROFESSIONNEL] })
+  @Expose({ groups: [CLIENT_GROUPS.PROFESSIONAL] })
   @Column({ name: 'tax_id', type: 'varchar', nullable: true })
   taxId?: string;
 
-  @Expose({ groups: [CLIENT_GROUPS.PROFESSIONNEL] })
+  @Expose({ groups: [CLIENT_GROUPS.PROFESSIONAL] })
   @Column({ name: 'ice', type: 'varchar', nullable: true })
   ice?: string;
 
-  @Expose({ groups: [CLIENT_GROUPS.PROFESSIONNEL] })
+  @Expose({ groups: [CLIENT_GROUPS.PROFESSIONAL] })
   @Column({ name: 'commercial_register', type: 'varchar', nullable: true })
   commercialRegister?: string;
 
-  @Expose({ groups: [CLIENT_GROUPS.PROFESSIONNEL] })
+  @Expose({ groups: [CLIENT_GROUPS.PROFESSIONAL] })
   @Column({ name: 'trade_license', type: 'varchar', nullable: true })
   tradeLicense?: string;
 
-  @Expose({ groups: [CLIENT_GROUPS.PROFESSIONNEL] })
+  @Expose({ groups: [CLIENT_GROUPS.PROFESSIONAL] })
   @Column({ name: 'vat_exempt', type: 'boolean', nullable: true })
   vatExempt?: boolean;
 
   // --- Relationships ---
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @ManyToOne(() => ClClient, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'sponsor_id' })
   sponsor?: ClClient;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @ManyToOne(() => ClClient, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'tutor_id' })
   tutor?: ClClient;
 
-  @Expose({ groups: [CLIENT_GROUPS.PARTICULIER] })
+  @Expose({ groups: [CLIENT_GROUPS.INDIVIDUAL] })
   @ManyToOne('ClFamilyGroup', 'members', {
     nullable: true,
     onDelete: 'SET NULL',
@@ -216,11 +216,11 @@ export class ClClient extends BaseEntity {
   @JoinColumn({ name: 'family_group_id' })
   familyGroup?: ClFamilyGroup;
 
-  @Expose({ groups: [CLIENT_GROUPS.PROFESSIONNEL] })
+  @Expose({ groups: [CLIENT_GROUPS.PROFESSIONAL] })
   @OneToOne('ClConvention', 'client')
   convention?: ClConvention;
 
-  @Expose({ groups: [CLIENT_GROUPS.PROFESSIONNEL] })
+  @Expose({ groups: [CLIENT_GROUPS.PROFESSIONAL] })
   @OneToMany('ClContactInterne', 'client')
   contactsInternes?: ClContactInterne[];
 }

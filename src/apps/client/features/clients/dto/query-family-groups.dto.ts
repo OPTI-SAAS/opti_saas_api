@@ -6,7 +6,7 @@ export class QueryFamilyGroupsDto extends PaginationQueryDto {
   @ApiPropertyOptional({ example: 'Benali' })
   @IsString()
   @IsOptional()
-  nom?: string;
+  name?: string;
 
   @ApiPropertyOptional({ example: 'Casablanca' })
   @IsString()

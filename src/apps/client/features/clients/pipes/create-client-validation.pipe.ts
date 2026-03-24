@@ -14,8 +14,8 @@ import {
 type CreateClientDtoConstructor = ClassConstructor<object>;
 
 const CREATE_CLIENT_DTO_MAP = {
-  [CLIENT_TYPES.PARTICULIER]: CreateParticulierClientDto,
-  [CLIENT_TYPES.PROFESSIONNEL]: CreateProfessionnelClientDto,
+  [CLIENT_TYPES.INDIVIDUAL]: CreateParticulierClientDto,
+  [CLIENT_TYPES.PROFESSIONAL]: CreateProfessionnelClientDto,
 } satisfies Record<ClientType, CreateClientDtoConstructor>;
 
 type CreateClientTypeKey = keyof typeof CREATE_CLIENT_DTO_MAP;
