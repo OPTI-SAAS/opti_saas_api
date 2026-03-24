@@ -1,200 +1,129 @@
-import {
-  CLIENT_TYPES,
-  ClientTitleValues,
-  ClientTypeValues,
-  IdDocumentTypeValues,
-} from '@lib/shared/enums/client/client.client.enum';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { CLIENT_TYPES } from '@lib/shared/enums/client/client.client.enum';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsBoolean,
-  IsDate,
   IsDefined,
-  IsEnum,
-  IsObject,
   IsOptional,
   IsString,
   IsUUID,
-  ValidateIf,
+  ValidateNested,
 } from 'class-validator';
 
-export class CreateClientDto {
-  @ApiProperty({
-    enum: ClientTypeValues,
-    example: CLIENT_TYPES.PARTICULIER,
+import { CreateContactInterneDto } from './contact-interne.dto';
+import { ConventionDto } from './convention.dto';
+import { CreateClientBaseDto } from './create-client-base.dto';
+import { CreateTutorPayloadDto } from './create-tutor-payload.dto';
+
+export class CreateClientDto extends CreateClientBaseDto {
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Referral/sponsor client ID',
   })
-  @IsString()
-  @IsEnum(ClientTypeValues)
-  @IsDefined()
-  type!: string;
-
-  // --- Shared base fields ---
-
-  @ApiPropertyOptional({ example: '0612345678' })
-  @IsString()
-  @IsOptional()
-  phone?: string;
-
-  @ApiPropertyOptional({ example: 'client@example.com' })
-  @IsString()
-  @IsOptional()
-  email?: string;
-
-  @ApiPropertyOptional({ example: 'Casablanca' })
-  @IsString()
-  @IsOptional()
-  city?: string;
-
-  @ApiPropertyOptional({ example: '123 Rue Mohammed V' })
-  @IsString()
-  @IsOptional()
-  address?: string;
-
-  // --- Particulier-specific fields (required when type = particulier) ---
-
-  @ApiPropertyOptional({ enum: ClientTitleValues, example: 'Mr' })
-  @ValidateIf((o) => o.type === CLIENT_TYPES.PARTICULIER)
-  @IsString()
-  @IsEnum(ClientTitleValues)
-  @IsDefined()
-  title?: string;
-
-  @ApiPropertyOptional({ example: 'Benali' })
-  @ValidateIf(
-    (o) => o.type === CLIENT_TYPES.PARTICULIER || o.lastName !== undefined,
-  )
-  @IsString()
-  @IsDefined({ message: 'lastName is required for particulier clients' })
-  lastName?: string;
-
-  @ApiPropertyOptional({ example: 'Youssef' })
-  @ValidateIf(
-    (o) => o.type === CLIENT_TYPES.PARTICULIER || o.firstName !== undefined,
-  )
-  @IsString()
-  @IsDefined({ message: 'firstName is required for particulier clients' })
-  firstName?: string;
-
-  @ApiPropertyOptional({ example: '1990-05-15' })
-  @ValidateIf((o) => o.type === CLIENT_TYPES.PARTICULIER)
-  @Type(() => Date)
-  @IsDate()
-  @IsDefined()
-  birthDate?: Date;
-
-  @ApiPropertyOptional({ format: 'uuid' })
   @IsUUID()
   @IsOptional()
   sponsorId?: string;
 
-  @ApiPropertyOptional()
-  @IsString()
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Existing tutor/legal guardian client ID',
+  })
+  @IsUUID()
   @IsOptional()
-  spouseName?: string;
+  tutorId?: string;
 
-  @ApiPropertyOptional({ enum: IdDocumentTypeValues })
-  @IsString()
-  @IsEnum(IdDocumentTypeValues)
+  @ApiPropertyOptional({
+    type: () => CreateTutorPayloadDto,
+    description: 'Inline tutor creation payload',
+  })
   @IsOptional()
-  idDocumentType?: string;
+  @ValidateNested()
+  @Type(() => CreateTutorPayloadDto)
+  tutorPayload?: CreateTutorPayloadDto;
 
-  @ApiPropertyOptional()
-  @IsString()
+  @ApiPropertyOptional({
+    example: false,
+    description: "If true, use the tutor's family group for the new client",
+  })
+  @IsBoolean()
   @IsOptional()
-  idDocumentNumber?: string;
+  useTutorFamily?: boolean;
 
   @ApiPropertyOptional({ format: 'uuid' })
   @IsUUID()
   @IsOptional()
   familyGroupId?: string;
 
-  @ApiPropertyOptional()
-  @IsString()
+  @ApiPropertyOptional({
+    type: () => ConventionDto,
+    description:
+      'Optional convention to create along with a professionnel client',
+  })
   @IsOptional()
-  familyLink?: string;
-
-  @ApiPropertyOptional()
-  @IsBoolean()
-  @IsOptional()
-  isOpticalBeneficiary?: boolean;
-
-  @ApiPropertyOptional()
-  @IsBoolean()
-  @IsOptional()
-  isFinancialResponsible?: boolean;
-
-  @ApiPropertyOptional()
-  @IsBoolean()
-  @IsOptional()
-  hasSharedMutual?: boolean;
-
-  @ApiPropertyOptional()
-  @IsBoolean()
-  @IsOptional()
-  hasSharedAddress?: boolean;
-
-  @ApiPropertyOptional()
-  @IsBoolean()
-  @IsOptional()
-  hasSocialCoverage?: boolean;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  coverageType?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  membershipNumber?: string;
+  @ValidateNested()
+  @Type(() => ConventionDto)
+  convention?: ConventionDto;
 
   @ApiPropertyOptional({
-    type: 'object',
-    additionalProperties: true,
-    example: { currentlyWearing: 'glasses', hasDryness: true },
+    type: () => [CreateContactInterneDto],
+    description:
+      'Optional internal contacts to create along with a professionnel client',
   })
-  @IsObject()
   @IsOptional()
-  medicalRecord?: Record<string, unknown>;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateContactInterneDto)
+  contacts?: CreateContactInterneDto[];
+}
 
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  notes?: string;
-
-  // --- Professionnel-specific fields (required when type = professionnel) ---
-
-  @ApiPropertyOptional({ example: 'OptikVision SARL' })
-  @ValidateIf((o) => o.type === CLIENT_TYPES.PROFESSIONNEL)
+export class CreateParticulierClientDto extends OmitType(CreateClientDto, [
+  'companyName',
+  'taxId',
+  'ice',
+  'commercialRegister',
+  'tradeLicense',
+  'vatExempt',
+] as const) {
+  @ApiProperty({
+    enum: [CLIENT_TYPES.INDIVIDUAL],
+    example: CLIENT_TYPES.INDIVIDUAL,
+  })
   @IsString()
   @IsDefined()
-  companyName?: string;
+  type!: typeof CLIENT_TYPES.INDIVIDUAL;
+}
 
-  @ApiPropertyOptional({ example: '12345678' })
-  @ValidateIf((o) => o.type === CLIENT_TYPES.PROFESSIONNEL)
+export class CreateProfessionnelClientDto extends OmitType(CreateClientDto, [
+  'walkIn',
+  'isMinor',
+  'title',
+  'lastName',
+  'firstName',
+  'birthDate',
+  'spouseName',
+  'idDocumentType',
+  'idDocumentNumber',
+  'familyLink',
+  'isOpticalBeneficiary',
+  'isFinancialResponsible',
+  'hasSharedMutual',
+  'hasSharedAddress',
+  'hasSocialCoverage',
+  'coverageType',
+  'membershipNumber',
+  'medicalRecord',
+  'sponsorId',
+  'tutorId',
+  'tutorPayload',
+  'useTutorFamily',
+  'familyGroupId',
+] as const) {
+  @ApiProperty({
+    enum: [CLIENT_TYPES.PROFESSIONAL],
+    example: CLIENT_TYPES.PROFESSIONAL,
+  })
   @IsString()
   @IsDefined()
-  taxId?: string;
-
-  @ApiPropertyOptional({ example: '001234567000012' })
-  @ValidateIf((o) => o.type === CLIENT_TYPES.PROFESSIONNEL)
-  @IsString()
-  @IsDefined()
-  ice?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  commercialRegister?: string;
-
-  @ApiPropertyOptional()
-  @IsString()
-  @IsOptional()
-  tradeLicense?: string;
-
-  @ApiPropertyOptional()
-  @ValidateIf((o) => o.type === CLIENT_TYPES.PROFESSIONNEL)
-  @IsBoolean()
-  @IsDefined()
-  vatExempt?: boolean;
+  type!: typeof CLIENT_TYPES.PROFESSIONAL;
 }

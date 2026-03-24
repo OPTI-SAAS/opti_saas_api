@@ -9,23 +9,23 @@ export class ClContactInterne extends BaseEntity {
   @Column({ name: 'client_id', type: 'uuid' })
   clientId!: string;
 
-  @Column({ name: 'nom', type: 'varchar' })
-  nom!: string;
+  @Column({ name: 'last_name', type: 'varchar' })
+  lastName!: string;
 
-  @Column({ name: 'prenom', type: 'varchar' })
-  prenom!: string;
+  @Column({ name: 'first_name', type: 'varchar' })
+  firstName!: string;
 
-  @Column({ name: 'fonction', type: 'varchar' })
-  fonction!: string;
+  @Column({ name: 'position', type: 'varchar' })
+  position!: string;
 
-  @Column({ name: 'telephone', type: 'varchar' })
-  telephone!: string;
+  @Column({ name: 'phone', type: 'varchar' })
+  phone!: string;
 
   @Column({ name: 'email', type: 'varchar' })
   email!: string;
 
-  @Column({ name: 'principal', type: 'boolean', default: false })
-  principal!: boolean;
+  @Column({ name: 'is_principal', type: 'boolean', default: false })
+  isPrincipal!: boolean;
 
   // --- Relationships ---
 

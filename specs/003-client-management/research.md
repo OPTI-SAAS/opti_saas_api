@@ -3,15 +3,15 @@
 ## Decision 1: Manual discriminator column instead of TypeORM STI
 
 - **Decision**: Use a single `ClClient` entity class with a manual `type` varchar column and nullable type-specific columns (single-table inheritance modeled manually).
-- **Rationale**: No entity in the codebase uses TypeORM's `@TableInheritance()`/`@ChildEntity()`. The three client types share ~80% of columns. A single entity works cleanly with `TenantRepositoryFactory.executeInTransaction()` and `manager.getRepository(ClClient)`. Type-specific validation is handled at the DTO/service layer.
+- **Rationale**: No entity in the codebase uses TypeORM's `@TableInheritance()`/`@ChildEntity()`. The two client types share ~80% of columns. Passage clients are modeled as `type='particulier'` with `passager=true` rather than a separate type. A single entity works cleanly with `TenantRepositoryFactory.executeInTransaction()` and `manager.getRepository(ClClient)`. Type-specific validation is handled at the DTO/service layer.
 - **Alternatives considered**:
   - TypeORM STI (`@ChildEntity`) — rejected: zero precedent in the project, documented bugs with relations and discriminator querying in TypeORM 0.3.x, uncertain behavior inside tenant-scoped transaction managers.
   - Separate tables per client type — rejected: over-engineered for the amount of shared data; cross-type queries (list all clients) would require UNION or polymorphic views.
 
 ## Decision 2: VARCHAR column with CHECK constraint for discriminator
 
-- **Decision**: Store `type` as `varchar` with a `@Check('CHK_clients_type', "type IN ('particulier', 'passage', 'professionnel')")` constraint.
-- **Rationale**: Constitution IX requires a DB-level CHECK or ENUM for discriminators. The project already uses `@Check` for numeric constraints on stock items. CHECK is preferred over PostgreSQL `CREATE TYPE ... AS ENUM` because adding/removing values is simpler (ALTER TABLE vs non-transactional ALTER TYPE).
+- **Decision**: Store `type` as `varchar` with a `@Check('CHK_clients_type', "type IN ('particulier', 'professionnel')")` constraint. Passage clients are distinguished by the `passager` boolean flag on `particulier` type, not by a separate type value.
+- **Rationale**: Constitution IX requires a DB-level CHECK or ENUM for discriminators. The project already uses `@Check` for numeric constraints on stock items. CHECK is preferred over PostgreSQL `CREATE TYPE ... AS ENUM` because adding/removing values is simpler (ALTER TABLE vs non-transactional ALTER TYPE). The 2-type model with a `passager` flag simplifies the discriminator while maintaining serialization flexibility via `CLIENT_GROUPS`.
 - **Alternatives considered**:
   - PostgreSQL ENUM type — rejected: adding values requires `ALTER TYPE ... ADD VALUE` (non-transactional before PG 12, no removal possible).
   - Plain varchar without constraint — rejected: violates Constitution IX requirement for DB-level enforcement.
@@ -31,13 +31,13 @@
 - **Alternatives considered**:
   - Using `deletedAt` for deactivation — rejected: TypeORM excludes soft-deleted rows by default, making "show inactive clients" queries cumbersome; reactivation reversal is not idiomatic.
 
-## Decision 5: UUID primary keys, integer for familyGroupId
+## Decision 5: UUID primary keys, family groups as separate entity
 
-- **Decision**: All PKs remain UUID (inherited from `BaseEntity`). `familyGroupId` is an `integer` nullable column used as a logical grouping label, not a foreign key.
-- **Rationale**: `BaseEntity` mandates UUID PKs. All infrastructure (tenant factory, guards, services) assumes UUID strings. The user's `id?: number` interface was early sketches; the implementation must use `id: string`. `familyGroupId` is not a PK or FK — it's a shared integer label that clusters related clients.
+- **Decision**: All PKs remain UUID (inherited from `BaseEntity`). `familyGroupId` is a `uuid` nullable FK column referencing `family_groups.id`. Family groups are a separate entity (`ClFamilyGroup`) with their own CRUD lifecycle.
+- **Rationale**: `BaseEntity` mandates UUID PKs. Family groups evolved from a simple integer label to a full entity with name, shared address (JSONB), and notes. This supports N1-N4 business rules: family search by address/phone/name, tutor-based family assignment, and minor auto-family creation. The FK ensures referential integrity and enables `ON DELETE SET NULL` to cleanly handle family group deletion.
 - **Alternatives considered**:
   - Integer PKs — rejected: would require replacing `BaseEntity`, breaking the entire entity inheritance chain.
-  - Family group as a separate table with FK — rejected: over-engineered for a simple clustering label; no CRUD operations on family groups themselves beyond assigning members.
+  - Family group as a simple integer label (no FK) — initially implemented, later replaced: requirements evolved to need CRUD on family groups (create, list, get, update, delete), shared address storage, and family search. A separate table with FK was necessary.
 
 ## Decision 6: Convention and ContactInterne as separate tables
 
